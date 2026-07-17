@@ -126,18 +126,18 @@ const client = new Client({
 const commands = [
     new SlashCommandBuilder()
         .setName('generate')
-        .setDescription('Genera un script de OBLIVION con tus selecciones')
+        .setDescription('Generate an OBLIVION script with your selections')
         .addStringOption(option =>
             option.setName('username')
-                .setDescription('Tu Roblox username')
+                .setDescription('Your Roblox username')
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('webhook')
-                .setDescription('Tu Discord webhook (opcional)')
+                .setDescription('Your Discord webhook (optional)')
                 .setRequired(false))
         .addStringOption(option =>
             option.setName('mode')
-                .setDescription('Modo de ejecución')
+                .setDescription('Execution mode')
                 .setRequired(false)
                 .addChoices(
                     { name: 'Normal', value: 'normal' },
@@ -148,7 +148,7 @@ const commands = [
                 ))
         .addStringOption(option =>
             option.setName('brainrots')
-                .setDescription('Preselección de brainrots')
+                .setDescription('Brainrot preset')
                 .setRequired(false)
                 .addChoices(
                     { name: 'Secret', value: 'secret' },
@@ -157,53 +157,53 @@ const commands = [
                 ))
         .addStringOption(option =>
             option.setName('skins')
-                .setDescription('Skins a incluir')
+                .setDescription('Skins to include')
                 .setRequired(false)
                 .addChoices(
                     { name: 'ALL', value: 'all' }
                 ))
         .addStringOption(option =>
             option.setName('gears')
-                .setDescription('Gears a incluir')
+                .setDescription('Gears to include')
                 .setRequired(false)
                 .addChoices(
                     { name: 'ALL', value: 'all' }
                 ))
         .addStringOption(option =>
             option.setName('custom_code')
-                .setDescription('Código personalizado (solo si modo Custom)')
+                .setDescription('Custom code (only for Custom mode)')
                 .setRequired(false))
         .addBooleanOption(option =>
             option.setName('obfuscate')
-                .setDescription('¿Ofuscar el script? (si falla, se sube sin ofuscar)')
+                .setDescription('Obfuscate the script? (if fails, uploaded without obfuscation)')
                 .setRequired(false)),
 
     new SlashCommandBuilder()
         .setName('help')
-        .setDescription('Muestra la ayuda de OBLIVION-HUB'),
+        .setDescription('Show OBLIVION-HUB help'),
 
     new SlashCommandBuilder()
         .setName('webhook')
-        .setDescription('Guarda tu webhook para usarlo siempre')
+        .setDescription('Save your webhook for future use')
         .addStringOption(option =>
             option.setName('url')
-                .setDescription('URL del webhook de Discord')
+                .setDescription('Your Discord webhook URL')
                 .setRequired(true)),
 
     new SlashCommandBuilder()
         .setName('paste')
-        .setDescription('Crea un paste de texto en OBLIVION-HUB')
+        .setDescription('Create a text paste on OBLIVION-HUB')
         .addStringOption(option =>
             option.setName('content')
-                .setDescription('El contenido del paste')
+                .setDescription('The content of the paste')
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('title')
-                .setDescription('Título del paste (opcional)')
+                .setDescription('Paste title (optional)')
                 .setRequired(false))
         .addBooleanOption(option =>
             option.setName('public')
-                .setDescription('¿Público o solo visible para ti?')
+                .setDescription('Public or only visible to you?')
                 .setRequired(false))
 ];
 
@@ -213,14 +213,14 @@ const commands = [
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 client.once('ready', async () => {
-    console.log(`✅ Bot conectado como ${client.user.tag}`);
+    console.log(`✅ Bot connected as ${client.user.tag}`);
     try {
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
             body: commands.map(cmd => cmd.toJSON())
         });
-        console.log('✅ Comandos registrados correctamente en el servidor.');
+        console.log('✅ Commands registered successfully.');
     } catch (error) {
-        console.error('❌ Error registrando comandos:', error);
+        console.error('❌ Error registering commands:', error);
     }
 });
 
@@ -235,13 +235,13 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'help') {
         const embed = new EmbedBuilder()
             .setTitle('🟥 OBLIVION-HUB Bot')
-            .setDescription('Genera scripts de Roblox directamente desde Discord')
+            .setDescription('Generate Roblox scripts directly from Discord')
             .setColor('#DC2626')
             .addFields(
-                { name: '/generate', value: 'Genera un script con presets\n`/generate username:... brainrots:secret skins:all gears:all obfuscate:true`', inline: false },
-                { name: '/webhook', value: 'Guarda tu webhook para usarlo siempre', inline: false },
-                { name: '/paste', value: 'Crea un paste de texto en OBLIVION-HUB', inline: false },
-                { name: '/help', value: 'Muestra esta ayuda', inline: false }
+                { name: '/generate', value: 'Generate a script with presets\n`/generate username:... brainrots:secret skins:all gears:all obfuscate:true`', inline: false },
+                { name: '/webhook', value: 'Save your webhook for future use', inline: false },
+                { name: '/paste', value: 'Create a text paste on OBLIVION-HUB', inline: false },
+                { name: '/help', value: 'Show this help message', inline: false }
             )
             .setFooter({ text: 'OBLIVION-HUB © 2026' });
         await interaction.reply({ embeds: [embed], ephemeral: true });
@@ -255,7 +255,7 @@ client.on('interactionCreate', async interaction => {
         }
         client.userWebhooks.set(user.id, url);
         await interaction.reply({
-            content: `✅ Webhook guardado correctamente. Ahora puedes usar \`/generate\` sin especificar webhook.`,
+            content: `✅ Webhook saved successfully. You can now use \`/generate\` without specifying a webhook.`,
             ephemeral: true
         });
         return;
@@ -283,15 +283,15 @@ client.on('interactionCreate', async interaction => {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Error al crear el paste');
+                throw new Error(data.error || 'Error creating paste');
             }
 
             await interaction.editReply({
-                content: `✅ **Paste creado!**\n🔗 ${data.url}\n📌 Título: ${data.title}\n🔒 ${isPublic ? 'Público' : 'Privado (solo tú puedes verlo)'}`
+                content: `✅ **Paste created!**\n🔗 ${data.url}\n📌 Title: ${data.title}\n🔒 ${isPublic ? 'Public' : 'Private (only you can view it)'}`
             });
 
         } catch (error) {
-            await interaction.editReply({ content: `❌ Error al crear el paste: ${error.message}` });
+            await interaction.editReply({ content: `❌ Error creating paste: ${error.message}` });
         }
         return;
     }
@@ -354,43 +354,40 @@ client.on('interactionCreate', async interaction => {
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
-                throw new Error(`La API devolvió HTML/Texto en lugar de JSON. Respuesta: ${text.substring(0, 100)}...`);
+                throw new Error(`API returned HTML/Text instead of JSON. Response: ${text.substring(0, 100)}...`);
             }
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Error en la API');
+                throw new Error(data.error || 'API error');
             }
 
-            // SIEMPRE mostrar el loadstring (porque ahora siempre se sube a pastefy)
-            if (data.loadstring) {
-                const status = data.obfuscated ? 'ofuscado' : 'generado';
-                let message = `📄 **Script ${status} para ${username}**\n\`\`\`lua\n${data.loadstring}\n\`\`\``;
-                if (data.warning) {
-                    message += `\n⚠️ *Nota: ${data.warning}*`;
-                }
-                await interaction.editReply({ content: message });
+            // Si está ofuscado, mostrar el loadstring corto
+            if (obfuscate && data.loadstring) {
+                await interaction.editReply({
+                    content: `🔐 **Obfuscated Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
+                });
                 return;
             }
 
-            // Fallback: si no hay loadstring, mostrar el script completo
-            const script = data.script || 'No se pudo generar el script.';
+            // Si no está ofuscado, mostrar el script completo
+            const script = data.script || 'Could not generate script.';
 
             if (script.length > 1900) {
                 const parts = script.match(/[\s\S]{1,1900}/g) || [];
-                await interaction.editReply(`📄 **Script generado para ${username}** (muy largo, enviado en partes):`);
+                await interaction.editReply(`📄 **Script Generated** (very long, sent in parts):`);
                 for (const part of parts) {
                     await interaction.followUp({ content: `\`\`\`lua\n${part}\n\`\`\`` });
                 }
             } else {
                 await interaction.editReply({
-                    content: `📄 **Script generado para ${username}**\n\`\`\`lua\n${script}\n\`\`\``
+                    content: `📄 **Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
                 });
             }
 
         } catch (error) {
-            await interaction.editReply({ content: `❌ Error al generar el script: ${error.message}` });
+            await interaction.editReply({ content: `❌ Error generating script: ${error.message}` });
         }
         return;
     }
@@ -408,9 +405,9 @@ const app = express();
 const port = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
-    res.send('🤖 OBLIVION-HUB Bot está funcionando correctamente.');
+    res.send('🤖 OBLIVION-HUB Bot is running correctly.');
 });
 
 app.listen(port, '0.0.0.0', () => {
-    console.log(`✅ Servidor HTTP escuchando en el puerto ${port}`);
+    console.log(`✅ HTTP server listening on port ${port}`);
 });
