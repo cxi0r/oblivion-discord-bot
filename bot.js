@@ -5,13 +5,12 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
-// ============================================================
-//  1. BOT DE DISCORD
-// ============================================================
+// Crear el cliente de Discord
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
+// Definir los comandos
 const commands = [
     new SlashCommandBuilder()
         .setName('generate')
@@ -29,6 +28,7 @@ const commands = [
         .setDescription('Muestra la ayuda de OBLIVION-HUB')
 ];
 
+// Registrar comandos al iniciar
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 client.once('ready', async () => {
@@ -43,6 +43,7 @@ client.once('ready', async () => {
     }
 });
 
+// Manejar interacciones
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -64,16 +65,17 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// Iniciar el bot
 client.login(TOKEN);
 
 // ============================================================
-//  2. SERVIDOR HTTP PARA RENDER (PUERTO 10000)
+//  SERVIDOR HTTP PARA MANTENER EL WEB SERVICE ACTIVO
 // ============================================================
 const app = express();
 const port = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
-    res.send('🤖 Bot de OBLIVION-HUB funcionando correctamente.');
+    res.send('🤖 OBLIVION-HUB Bot está funcionando correctamente.');
 });
 
 app.listen(port, '0.0.0.0', () => {
