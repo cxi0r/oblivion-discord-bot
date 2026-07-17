@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -9,7 +9,10 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
-const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
+const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || 'ID_DEL_CANAL_COMMANDS';
+const WEBHOOK_CATEGORY_ID = '1527769313040269322';
+const MAX_WEBHOOKS = 350;
+const BOT_OWNER_ID = 'TU_ID_DE_DISCORD'; // Reemplaza con tu ID de usuario
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -122,6 +125,11 @@ const client = new Client({
 });
 
 // ============================================================
+//  ALMACENAMIENTO DE WEBHOOKS DE USUARIOS
+// ============================================================
+const userWebhooks = new Map();
+
+// ============================================================
 //  FILTRO DE MENSAJES EN EL CANAL #COMMANDS
 // ============================================================
 client.on('messageCreate', async (message) => {
@@ -210,11 +218,10 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName('webhook')
-        .setDescription('Save your webhook for future use')
-        .addStringOption(option =>
-            option.setName('url')
-                .setDescription('Your Discord webhook URL')
-                .setRequired(true)),
+        .setDescription('Create a personal webhook channel')
+        .addSubcommand(sub => 
+            sub.setName('create')
+                .setDescription('Create a personal webhook channel for you')),
 
     new SlashCommandBuilder()
         .setName('paste')
@@ -267,6 +274,183 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // ---- WEBHOOK CREATE ----
+    if (commandName === 'webhook') {
+        const subcommand = options.getSubcommand();
+
+        if (subcommand === 'create') {
+            await interaction.deferReply({ ephemeral: true });
+
+            try {
+                const guild = interaction.guild;
+                const category = guild.channels.cache.get(WEBHOOK_CATEGORY_ID);
+
+                if (!category) {
+                    await interaction.editReply({
+                        content: '❌ The webhook category was not found. Please contact an administrator.',
+                        ephemeral: true
+                    });
+                    return;
+                }
+
+                // Verificar si el usuario ya tiene un webhook
+                const existingData = userWebhooks.get(user.id);
+                if (existingData) {
+                    // Mensaje bilingüe de advertencia
+                    const warningMessage = 
+                        `⚠️ **ENGLISH:** You already have a webhook. If you create a new one, your existing webhook will be automatically deleted and replaced.\n\n` +
+                        `⚠️ **ESPAÑOL:** Ya tienes un webhook. Si creas uno nuevo, tu webhook existente será eliminado automáticamente y reemplazado.`;
+
+                    await interaction.editReply({
+                        content: warningMessage,
+                        ephemeral: true
+                    });
+
+                    // Eliminar el webhook y canal anterior
+                    try {
+                        const oldChannel = guild.channels.cache.get(existingData.channelId);
+                        if (oldChannel) {
+                            // Eliminar todos los webhooks del canal
+                            const webhooks = await oldChannel.fetchWebhooks();
+                            for (const [id, webhook] of webhooks) {
+                                await webhook.delete();
+                            }
+                            await oldChannel.delete();
+                        }
+                        userWebhooks.delete(user.id);
+                    } catch (error) {
+                        console.error('Error al eliminar webhook anterior:', error);
+                    }
+                }
+
+                // Obtener el siguiente número disponible para el nombre del canal
+                const existingChannels = category.children.cache
+                    .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'))
+                    .sort((a, b) => {
+                        const numA = parseInt(a.name.split('-')[1]) || 0;
+                        const numB = parseInt(b.name.split('-')[1]) || 0;
+                        return numA - numB;
+                    });
+
+                let nextNumber = 1;
+                for (const channel of existingChannels.values()) {
+                    const num = parseInt(channel.name.split('-')[1]) || 0;
+                    if (num >= nextNumber) {
+                        nextNumber = num + 1;
+                    }
+                }
+
+                if (nextNumber > MAX_WEBHOOKS) {
+                    await interaction.editReply({
+                        content: `❌ Maximum number of webhook channels (${MAX_WEBHOOKS}) reached.`,
+                        ephemeral: true
+                    });
+                    return;
+                }
+
+                const channelName = `webhook-${nextNumber}`;
+
+                // Crear canal privado
+                const newChannel = await guild.channels.create({
+                    name: channelName,
+                    type: ChannelType.GuildText,
+                    parent: WEBHOOK_CATEGORY_ID,
+                    permissionOverwrites: [
+                        {
+                            id: guild.id, // @everyone
+                            deny: [PermissionsBitField.Flags.ViewChannel],
+                        },
+                        {
+                            id: user.id, // Usuario creador
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory,
+                                PermissionsBitField.Flags.AttachFiles,
+                                PermissionsBitField.Flags.EmbedLinks,
+                            ],
+                        },
+                        {
+                            id: BOT_OWNER_ID, // Dueño del bot (tú)
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory,
+                                PermissionsBitField.Flags.ManageChannels,
+                                PermissionsBitField.Flags.ManageMessages,
+                            ],
+                        },
+                        {
+                            id: client.user.id, // El bot
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory,
+                                PermissionsBitField.Flags.ManageMessages,
+                                PermissionsBitField.Flags.ManageWebhooks,
+                            ],
+                        },
+                    ],
+                });
+
+                // Crear webhook
+                const webhook = await newChannel.createWebhook({
+                    name: `webhook-${user.username}`,
+                    avatar: user.displayAvatarURL(),
+                });
+
+                // Guardar referencia
+                userWebhooks.set(user.id, {
+                    channelId: newChannel.id,
+                    webhookUrl: webhook.url,
+                    webhookId: webhook.id,
+                    createdAt: Date.now(),
+                });
+
+                // Mensaje de éxito bilingüe
+                const successMessage = 
+                    `✅ **ENGLISH:** Your webhook channel has been created successfully!\n` +
+                    `📁 Channel: <#${newChannel.id}>\n` +
+                    `🔗 Webhook URL: ||${webhook.url}||\n\n` +
+                    `📌 **SPANISH:** ¡Tu canal de webhook ha sido creado exitosamente!\n` +
+                    `📁 Canal: <#${newChannel.id}>\n` +
+                    `🔗 URL del Webhook: ||${webhook.url}||\n\n` +
+                    `⚠️ Only you and the bot owner can see this channel. / Solo tú y el dueño del bot pueden ver este canal.`;
+
+                // Enviar por DM
+                try {
+                    await user.send({
+                        content: successMessage
+                    });
+                } catch (dmError) {
+                    console.log('No se pudo enviar DM al usuario');
+                }
+
+                // Responder en el canal (ephemeral)
+                await interaction.editReply({
+                    content: successMessage,
+                    ephemeral: true
+                });
+
+                // También enviar un mensaje en el canal creado
+                await newChannel.send({
+                    content: `🔔 **${user.username}**, this is your personal webhook channel.\n\n` +
+                             `📌 Only you and the bot owner can see this channel.\n` +
+                             `🔗 Your webhook URL: ||${webhook.url}||\n\n` +
+                             `⚠️ Keep this URL private. Anyone with this URL can send messages to this channel.`
+                });
+
+            } catch (error) {
+                console.error('Error al crear webhook:', error);
+                await interaction.editReply({
+                    content: `❌ Error creating webhook: ${error.message}`,
+                    ephemeral: true
+                });
+            }
+            return;
+        }
+    }
+
     // ---- HELP ----
     if (commandName === 'help') {
         const embed = new EmbedBuilder()
@@ -275,26 +459,12 @@ client.on('interactionCreate', async interaction => {
             .setColor('#DC2626')
             .addFields(
                 { name: '/generate', value: 'Generate a script with presets\n`/generate username:... brainrots:secret skins:all gears:all obfuscate:true`', inline: false },
-                { name: '/webhook', value: 'Save your webhook for future use', inline: false },
+                { name: '/webhook create', value: 'Create a personal webhook channel for you', inline: false },
                 { name: '/paste', value: 'Create a text paste on OBLIVION-HUB', inline: false },
                 { name: '/help', value: 'Show this help message', inline: false }
             )
             .setFooter({ text: 'OBLIVION-HUB © 2026' });
         await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
-    }
-
-    // ---- WEBHOOK ----
-    if (commandName === 'webhook') {
-        const url = options.getString('url');
-        if (!client.userWebhooks) {
-            client.userWebhooks = new Map();
-        }
-        client.userWebhooks.set(user.id, url);
-        await interaction.reply({
-            content: `✅ Webhook saved successfully. You can now use \`/generate\` without specifying a webhook.`,
-            ephemeral: true
-        });
         return;
     }
 
@@ -360,7 +530,8 @@ client.on('interactionCreate', async interaction => {
             const obfuscate = options.getBoolean('obfuscate') || false;
 
             if (!webhook && client.userWebhooks?.has(user.id)) {
-                webhook = client.userWebhooks.get(user.id);
+                // Si el usuario tiene webhook guardado, no se usa para el script
+                // Solo se usa el webhook que especifique en el comando
             }
 
             let brainrots = [];
