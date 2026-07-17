@@ -12,7 +12,7 @@ const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
 const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
-const BOT_OWNER_ID = '1427070113017761833'; // CORREGIDO (sin la D)
+const BOT_OWNER_ID = '1427070113017761833'; // ⚠️ CORREGIDO: sin la 'D'
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -293,23 +293,6 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                // Verificar si el bot tiene permisos para crear canales y webhooks
-                const botMember = guild.members.cache.get(client.user.id);
-                if (!botMember.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-                    await interaction.editReply({
-                        content: '❌ I don\'t have permission to create channels. Please give me the "Manage Channels" permission.',
-                        ephemeral: true
-                    });
-                    return;
-                }
-                if (!botMember.permissions.has(PermissionsBitField.Flags.ManageWebhooks)) {
-                    await interaction.editReply({
-                        content: '❌ I don\'t have permission to create webhooks. Please give me the "Manage Webhooks" permission.',
-                        ephemeral: true
-                    });
-                    return;
-                }
-
                 // Verificar si el usuario ya tiene un webhook
                 const existingData = userWebhooks.get(user.id);
                 if (existingData) {
@@ -322,7 +305,6 @@ client.on('interactionCreate', async interaction => {
                         ephemeral: true
                     });
 
-                    // Eliminar el webhook y canal anterior
                     try {
                         const oldChannel = guild.channels.cache.get(existingData.channelId);
                         if (oldChannel) {
@@ -365,22 +347,22 @@ client.on('interactionCreate', async interaction => {
 
                 const channelName = `webhook-${nextNumber}`;
 
-                // Obtener el usuario dueño del bot (para darle permisos)
-                let ownerMember = null;
-                try {
-                    ownerMember = await guild.members.fetch(BOT_OWNER_ID);
-                } catch (e) {
-                    console.warn('No se pudo obtener el usuario dueño del bot:', e);
-                }
+                // --- Obtener el dueño del bot y el usuario en caché ---
+                const ownerUser = await guild.members.fetch(BOT_OWNER_ID).catch(() => null);
+                const botMember = guild.members.cache.get(client.user.id);
+                const userMember = await guild.members.fetch(user.id).catch(() => null);
 
-                // Construir permissionOverwrites
+                // Construir permisos dinámicamente
                 const permissionOverwrites = [
                     {
                         id: guild.id, // @everyone
                         deny: [PermissionsBitField.Flags.ViewChannel],
-                    },
-                    {
-                        id: user.id, // Usuario creador
+                    }
+                ];
+
+                if (userMember) {
+                    permissionOverwrites.push({
+                        id: user.id,
                         allow: [
                             PermissionsBitField.Flags.ViewChannel,
                             PermissionsBitField.Flags.SendMessages,
@@ -388,21 +370,10 @@ client.on('interactionCreate', async interaction => {
                             PermissionsBitField.Flags.AttachFiles,
                             PermissionsBitField.Flags.EmbedLinks,
                         ],
-                    },
-                    {
-                        id: client.user.id, // El bot
-                        allow: [
-                            PermissionsBitField.Flags.ViewChannel,
-                            PermissionsBitField.Flags.SendMessages,
-                            PermissionsBitField.Flags.ReadMessageHistory,
-                            PermissionsBitField.Flags.ManageMessages,
-                            PermissionsBitField.Flags.ManageWebhooks,
-                        ],
-                    },
-                ];
+                    });
+                }
 
-                // Añadir permisos para el dueño del bot si se encontró
-                if (ownerMember) {
+                if (ownerUser) {
                     permissionOverwrites.push({
                         id: BOT_OWNER_ID,
                         allow: [
@@ -415,7 +386,19 @@ client.on('interactionCreate', async interaction => {
                     });
                 }
 
-                // Crear canal
+                if (botMember) {
+                    permissionOverwrites.push({
+                        id: client.user.id,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages,
+                            PermissionsBitField.Flags.ReadMessageHistory,
+                            PermissionsBitField.Flags.ManageMessages,
+                            PermissionsBitField.Flags.ManageWebhooks,
+                        ],
+                    });
+                }
+
                 const newChannel = await guild.channels.create({
                     name: channelName,
                     type: ChannelType.GuildText,
@@ -437,7 +420,6 @@ client.on('interactionCreate', async interaction => {
                     createdAt: Date.now(),
                 });
 
-                // Mensaje de éxito bilingüe
                 const successMessage = 
                     `✅ **ENGLISH:** Your webhook channel has been created successfully!\n` +
                     `📁 Channel: <#${newChannel.id}>\n` +
@@ -447,20 +429,15 @@ client.on('interactionCreate', async interaction => {
                     `🔗 URL del Webhook: ||${webhook.url}||\n\n` +
                     `⚠️ Only you and the bot owner can see this channel. / Solo tú y el dueño del bot pueden ver este canal.`;
 
-                // Enviar por DM
                 try {
                     await user.send({ content: successMessage });
-                } catch (dmError) {
-                    console.log('No se pudo enviar DM al usuario');
-                }
+                } catch (dmError) {}
 
-                // Responder en el canal (ephemeral)
                 await interaction.editReply({
                     content: successMessage,
                     ephemeral: true
                 });
 
-                // También enviar un mensaje en el canal creado
                 await newChannel.send({
                     content: `🔔 **${user.username}**, this is your personal webhook channel.\n\n` +
                              `📌 Only you and the bot owner can see this channel.\n` +
@@ -556,9 +533,6 @@ client.on('interactionCreate', async interaction => {
             const gearsOption = options.getString('gears') || null;
             const customCode = options.getString('custom_code') || '';
             const obfuscate = options.getBoolean('obfuscate') || false;
-
-            // Si no se proporciona webhook y el usuario tiene uno guardado (pero no lo usamos para el script)
-            // Solo se usa el webhook que especifique en el comando
 
             let brainrots = [];
             if (brainrotPreset === 'secret') {
