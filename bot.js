@@ -12,7 +12,7 @@ const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
 const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
-const BOT_OWNER_ID = '1427070113017761833D'; // Reemplaza con tu ID de usuario
+const BOT_OWNER_ID = '1427070113017761833'; // Reemplaza con tu ID (sin la D)
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -310,7 +310,6 @@ client.on('interactionCreate', async interaction => {
                     try {
                         const oldChannel = guild.channels.cache.get(existingData.channelId);
                         if (oldChannel) {
-                            // Eliminar todos los webhooks del canal
                             const webhooks = await oldChannel.fetchWebhooks();
                             for (const [id, webhook] of webhooks) {
                                 await webhook.delete();
@@ -350,47 +349,67 @@ client.on('interactionCreate', async interaction => {
 
                 const channelName = `webhook-${nextNumber}`;
 
+                // --- OBTENER USUARIOS PARA PERMISOS ---
+                const ownerMember = await guild.members.fetch(BOT_OWNER_ID).catch(() => null);
+                const botMember = guild.members.cache.get(client.user.id);
+
+                // Construir los permissionOverwrites de forma segura
+                const permissionOverwrites = [];
+
+                // @everyone: Deny ViewChannel
+                permissionOverwrites.push({
+                    id: guild.roles.everyone.id,
+                    deny: [PermissionsBitField.Flags.ViewChannel],
+                });
+
+                // Usuario creador: permitir ver y enviar mensajes
+                permissionOverwrites.push({
+                    id: user.id,
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.SendMessages,
+                        PermissionsBitField.Flags.ReadMessageHistory,
+                        PermissionsBitField.Flags.AttachFiles,
+                        PermissionsBitField.Flags.EmbedLinks,
+                    ],
+                });
+
+                // Dueño del bot (si existe en el servidor)
+                if (ownerMember) {
+                    permissionOverwrites.push({
+                        id: BOT_OWNER_ID,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages,
+                            PermissionsBitField.Flags.ReadMessageHistory,
+                            PermissionsBitField.Flags.ManageChannels,
+                            PermissionsBitField.Flags.ManageMessages,
+                        ],
+                    });
+                } else {
+                    console.warn(`⚠️ El dueño del bot (${BOT_OWNER_ID}) no se encontró en el servidor. No se aplicarán permisos especiales.`);
+                }
+
+                // El bot mismo
+                if (botMember) {
+                    permissionOverwrites.push({
+                        id: client.user.id,
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages,
+                            PermissionsBitField.Flags.ReadMessageHistory,
+                            PermissionsBitField.Flags.ManageMessages,
+                            PermissionsBitField.Flags.ManageWebhooks,
+                        ],
+                    });
+                }
+
                 // Crear canal privado
                 const newChannel = await guild.channels.create({
                     name: channelName,
                     type: ChannelType.GuildText,
                     parent: WEBHOOK_CATEGORY_ID,
-                    permissionOverwrites: [
-                        {
-                            id: guild.id, // @everyone
-                            deny: [PermissionsBitField.Flags.ViewChannel],
-                        },
-                        {
-                            id: user.id, // Usuario creador
-                            allow: [
-                                PermissionsBitField.Flags.ViewChannel,
-                                PermissionsBitField.Flags.SendMessages,
-                                PermissionsBitField.Flags.ReadMessageHistory,
-                                PermissionsBitField.Flags.AttachFiles,
-                                PermissionsBitField.Flags.EmbedLinks,
-                            ],
-                        },
-                        {
-                            id: BOT_OWNER_ID, // Dueño del bot (tú)
-                            allow: [
-                                PermissionsBitField.Flags.ViewChannel,
-                                PermissionsBitField.Flags.SendMessages,
-                                PermissionsBitField.Flags.ReadMessageHistory,
-                                PermissionsBitField.Flags.ManageChannels,
-                                PermissionsBitField.Flags.ManageMessages,
-                            ],
-                        },
-                        {
-                            id: client.user.id, // El bot
-                            allow: [
-                                PermissionsBitField.Flags.ViewChannel,
-                                PermissionsBitField.Flags.SendMessages,
-                                PermissionsBitField.Flags.ReadMessageHistory,
-                                PermissionsBitField.Flags.ManageMessages,
-                                PermissionsBitField.Flags.ManageWebhooks,
-                            ],
-                        },
-                    ],
+                    permissionOverwrites: permissionOverwrites,
                 });
 
                 // Crear webhook
@@ -528,11 +547,6 @@ client.on('interactionCreate', async interaction => {
             const gearsOption = options.getString('gears') || null;
             const customCode = options.getString('custom_code') || '';
             const obfuscate = options.getBoolean('obfuscate') || false;
-
-            if (!webhook && client.userWebhooks?.has(user.id)) {
-                // Si el usuario tiene webhook guardado, no se usa para el script
-                // Solo se usa el webhook que especifique en el comando
-            }
 
             let brainrots = [];
             if (brainrotPreset === 'secret') {
