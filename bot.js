@@ -82,7 +82,7 @@ const BRAINROTS_SECRET = [
     'To to to Sahur', 'Torrtuginni Dragonfrutini', 'Tralaledon',
     'Trenostruzzo Turbo 4000', 'Trickolino', 'Triplito Tralaleritos',
     'Tuff Toucan', 'Ventoliero Pavonero', 'Venuspino', 'Vulturino Skeletono',
-    'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano', 
+    'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano',
     'Bufalino Boomberino', 'Esok Goala', 'Los Tangcitos', 'Los Tictacs', 'Los Admins', 'Moby Bros', 'Var Var Var'
 ];
 
@@ -367,6 +367,14 @@ client.on('interactionCreate', async interaction => {
             if (obfuscate && data.loadstring) {
                 await interaction.editReply({
                     content: `🔐 **Script ofuscado generado para ${username}**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
+                });
+                return;
+            }
+
+            // Si está ofuscado pero no hay loadstring (caso de error parcial), mostrar el script
+            if (obfuscate && data.script) {
+                await interaction.editReply({
+                    content: `📄 **Script generado para ${username}** (la ofuscación no se pudo completar)\n\`\`\`lua\n${data.script}\n\`\`\``
                 });
                 return;
             }
