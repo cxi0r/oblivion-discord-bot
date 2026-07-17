@@ -124,7 +124,6 @@ const client = new Client({
 //  DEFINICIÓN DE COMANDOS SLASH
 // ============================================================
 const commands = [
-    // Comando principal: generate (con presets y opciones)
     new SlashCommandBuilder()
         .setName('generate')
         .setDescription('Genera un script de OBLIVION con tus selecciones')
@@ -147,7 +146,6 @@ const commands = [
                     { name: 'Dupe/Spawn', value: 'dupespawn' },
                     { name: 'Custom', value: 'custom' }
                 ))
-        // NUEVO: Preset para brainrots (Secret, OG, ALL)
         .addStringOption(option =>
             option.setName('brainrots')
                 .setDescription('Preselección de brainrots')
@@ -157,7 +155,6 @@ const commands = [
                     { name: 'OG', value: 'og' },
                     { name: 'ALL (Secret + OG)', value: 'all' }
                 ))
-        // NUEVO: Skins (all o lista manual)
         .addStringOption(option =>
             option.setName('skins')
                 .setDescription('Skins a incluir')
@@ -165,7 +162,6 @@ const commands = [
                 .addChoices(
                     { name: 'ALL', value: 'all' }
                 ))
-        // NUEVO: Gears (all o lista manual)
         .addStringOption(option =>
             option.setName('gears')
                 .setDescription('Gears a incluir')
@@ -182,12 +178,10 @@ const commands = [
                 .setDescription('¿Ofuscar el script y usar Pastefy?')
                 .setRequired(false)),
 
-    // Comando de ayuda
     new SlashCommandBuilder()
         .setName('help')
         .setDescription('Muestra la ayuda de OBLIVION-HUB'),
 
-    // Comando para guardar webhook
     new SlashCommandBuilder()
         .setName('webhook')
         .setDescription('Guarda tu webhook para usarlo siempre')
@@ -196,7 +190,6 @@ const commands = [
                 .setDescription('URL del webhook de Discord')
                 .setRequired(true)),
 
-    // Comando para crear paste interno
     new SlashCommandBuilder()
         .setName('paste')
         .setDescription('Crea un paste de texto en OBLIVION-HUB')
@@ -239,7 +232,6 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName, user, options } = interaction;
 
-    // ---- HELP ----
     if (commandName === 'help') {
         const embed = new EmbedBuilder()
             .setTitle('🟥 OBLIVION-HUB Bot')
@@ -256,7 +248,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // ---- WEBHOOK ----
     if (commandName === 'webhook') {
         const url = options.getString('url');
         if (!client.userWebhooks) {
@@ -270,7 +261,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // ---- PASTE ----
     if (commandName === 'paste') {
         await interaction.deferReply({ ephemeral: false });
 
@@ -306,7 +296,6 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // ---- GENERATE ----
     if (commandName === 'generate') {
         await interaction.deferReply({ ephemeral: false });
 
@@ -320,12 +309,10 @@ client.on('interactionCreate', async interaction => {
             const customCode = options.getString('custom_code') || '';
             const obfuscate = options.getBoolean('obfuscate') || false;
 
-            // Si no se proporcionó webhook, intentar obtener el guardado
             if (!webhook && client.userWebhooks?.has(user.id)) {
                 webhook = client.userWebhooks.get(user.id);
             }
 
-            // --- CONSTRUIR BRAINROTS SEGÚN PRESET ---
             let brainrots = [];
             if (brainrotPreset === 'secret') {
                 brainrots = BRAINROTS_SECRET;
@@ -334,11 +321,9 @@ client.on('interactionCreate', async interaction => {
             } else if (brainrotPreset === 'all') {
                 brainrots = [...BRAINROTS_SECRET, ...BRAINROTS_OG];
             } else {
-                // Si no se especifica preset, se usa lista vacía (solo las tablas vacías)
                 brainrots = [];
             }
 
-            // --- CONSTRUIR SKINS Y GEARS ---
             let skins = [];
             let gears = [];
 
@@ -350,7 +335,6 @@ client.on('interactionCreate', async interaction => {
                 gears = GEAR_ITEMS;
             }
 
-            // Llamar a la API de Vercel
             const response = await fetch(`${API_URL}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -367,7 +351,6 @@ client.on('interactionCreate', async interaction => {
                 })
             });
 
-            // Verificar si la respuesta es JSON
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
@@ -380,7 +363,6 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'Error en la API');
             }
 
-            // Si está ofuscado, mostrar el loadstring corto
             if (obfuscate && data.loadstring) {
                 await interaction.editReply({
                     content: `🔐 **Script ofuscado generado para ${username}**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
@@ -388,7 +370,6 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-            // Si no está ofuscado, mostrar el script completo
             const script = data.script || 'No se pudo generar el script.';
 
             if (script.length > 1900) {
