@@ -12,7 +12,7 @@ const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || 'ID_DEL_CANAL_COMMANDS';
 const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
-const BOT_OWNER_ID = 'TU_ID_DE_DISCORD'; // Reemplaza con tu ID de usuario
+const BOT_OWNER_ID = '1427070113017761833D'; // Reemplaza con tu ID de usuario
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
