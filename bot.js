@@ -238,7 +238,7 @@ client.on('interactionCreate', async interaction => {
             .setDescription('Genera scripts de Roblox directamente desde Discord')
             .setColor('#DC2626')
             .addFields(
-                { name: '/generate', value: 'Genera un script con presets\n`/generate username:... brainrots:secret skins:all gears:all`', inline: false },
+                { name: '/generate', value: 'Genera un script con presets\n`/generate username:... brainrots:secret skins:all gears:all obfuscate:true`', inline: false },
                 { name: '/webhook', value: 'Guarda tu webhook para usarlo siempre', inline: false },
                 { name: '/paste', value: 'Crea un paste de texto en OBLIVION-HUB', inline: false },
                 { name: '/help', value: 'Muestra esta ayuda', inline: false }
@@ -363,6 +363,7 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'Error en la API');
             }
 
+            // Si está ofuscado, mostrar el loadstring corto
             if (obfuscate && data.loadstring) {
                 await interaction.editReply({
                     content: `🔐 **Script ofuscado generado para ${username}**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
@@ -370,6 +371,7 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
+            // Si no está ofuscado, mostrar el script completo
             const script = data.script || 'No se pudo generar el script.';
 
             if (script.length > 1900) {
