@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -9,6 +9,7 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
+const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || 'ID_DEL_CANAL_COMMANDS'; // Reemplaza con el ID de tu canal #commands
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -230,8 +231,18 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName, user, options } = interaction;
+    const { commandName, user, options, channelId } = interaction;
 
+    // --- VERIFICACIÓN DEL CANAL ---
+    if (channelId !== ALLOWED_CHANNEL_ID) {
+        await interaction.reply({
+            content: `❌ Please use this command in the <#${ALLOWED_CHANNEL_ID}> channel.`,
+            ephemeral: true
+        });
+        return;
+    }
+
+    // --- HELP ---
     if (commandName === 'help') {
         const embed = new EmbedBuilder()
             .setTitle('🟥 OBLIVION-HUB Bot')
@@ -248,6 +259,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // --- WEBHOOK ---
     if (commandName === 'webhook') {
         const url = options.getString('url');
         if (!client.userWebhooks) {
@@ -261,8 +273,10 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
+    // --- PASTE ---
     if (commandName === 'paste') {
-        await interaction.deferReply({ ephemeral: false });
+        // Para el comando /paste, también respondemos por DM (opcional)
+        await interaction.deferReply({ ephemeral: true });
 
         const content = options.getString('content');
         const title = options.getString('title') || 'Untitled';
@@ -286,18 +300,31 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'Error creating paste');
             }
 
-            await interaction.editReply({
-                content: `✅ **Paste created!**\n🔗 ${data.url}\n📌 Title: ${data.title}\n🔒 ${isPublic ? 'Public' : 'Private (only you can view it)'}`
-            });
+            // Enviar el paste por DM
+            try {
+                await user.send({
+                    content: `✅ **Paste created!**\n🔗 ${data.url}\n📌 Title: ${data.title}\n🔒 ${isPublic ? 'Public' : 'Private (only you can view it)'}`
+                });
+                await interaction.editReply({
+                    content: `✅ Paste sent to your DMs!`,
+                    ephemeral: true
+                });
+            } catch (dmError) {
+                await interaction.editReply({
+                    content: `✅ **Paste created!**\n🔗 ${data.url}\n📌 Title: ${data.title}\n🔒 ${isPublic ? 'Public' : 'Private (only you can view it)'}\n\n❌ Could not send you a DM. Please enable DMs from server members.`,
+                    ephemeral: true
+                });
+            }
 
         } catch (error) {
-            await interaction.editReply({ content: `❌ Error creating paste: ${error.message}` });
+            await interaction.editReply({ content: `❌ Error creating paste: ${error.message}`, ephemeral: true });
         }
         return;
     }
 
+    // --- GENERATE ---
     if (commandName === 'generate') {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const username = options.getString('username');
@@ -363,31 +390,31 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'API error');
             }
 
-            // Si está ofuscado, mostrar el loadstring corto
+            // Construir el mensaje a enviar por DM
+            let dmContent = '';
             if (obfuscate && data.loadstring) {
-                await interaction.editReply({
-                    content: `🔐 **Obfuscated Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
-                });
-                return;
+                dmContent = `🔐 **Obfuscated Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``;
+            } else {
+                dmContent = `📄 **Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``;
             }
 
-            // Si no está ofuscado, mostrar el script completo
-            const script = data.script || 'Could not generate script.';
-
-            if (script.length > 1900) {
-                const parts = script.match(/[\s\S]{1,1900}/g) || [];
-                await interaction.editReply(`📄 **Script Generated** (very long, sent in parts):`);
-                for (const part of parts) {
-                    await interaction.followUp({ content: `\`\`\`lua\n${part}\n\`\`\`` });
-                }
-            } else {
+            // Enviar por DM
+            try {
+                await user.send({ content: dmContent });
                 await interaction.editReply({
-                    content: `📄 **Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``
+                    content: `✅ Script sent to your DMs!`,
+                    ephemeral: true
+                });
+            } catch (dmError) {
+                // Fallback: si no se puede enviar DM, mostrar en el canal (ephemeral)
+                await interaction.editReply({
+                    content: dmContent + `\n\n❌ Could not send you a DM. Please enable DMs from server members.`,
+                    ephemeral: true
                 });
             }
 
         } catch (error) {
-            await interaction.editReply({ content: `❌ Error generating script: ${error.message}` });
+            await interaction.editReply({ content: `❌ Error generating script: ${error.message}`, ephemeral: true });
         }
         return;
     }
