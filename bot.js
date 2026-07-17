@@ -11,6 +11,105 @@ const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 
 // ============================================================
+//  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
+// ============================================================
+const BRAINROTS_SECRET = [
+    '1x1x1x1', '25', '67', 'Abyssaloco', 'Agarrini la Palini', 'Antonio',
+    'Aquarino', 'Arcadopus', 'Arcadragon', 'Bacuru and Egguru', 'Bananito',
+    'Baskito', 'Bearito Cabinito', 'Berryno', 'Bisonte Giuppitere',
+    'Blackhole Goat', 'Boatito Auratito', 'Bombardiro Vaccariro', 'Boppin Bunny',
+    'Brunito Marsito', 'Buho de Volto', 'Bunito Bunito Spinito',
+    'Bunny Bunny Bunny Sahur', 'Bunny and Eggy', 'Bunnyman', 'Buntteo',
+    'Burguro And Fryuro', 'Burrito Bandito', 'Camera Ramena', 'Capitano Gullini',
+    'Capitano Moby', 'Cash or Card', 'Caylusaurus', 'Celestial Pegasus',
+    'Celularcini Viciosini', 'Cerberus', 'Chachechi', 'Chicleteira Bicicleteira',
+    'Chicleteira Cupideira', 'Chicleteira Noelteira', 'Chicleteira Surfeiteira',
+    'Chicleteirina Bicicleteirina', 'Chill Puppy', 'Chillin Chili', 'Chimnino',
+    'Chipso and Queso', 'Churrito Bunnito', 'Cigno Fulgoro', 'Cloverat Clapat',
+    'Coco and Mango', 'Cooki and Milki', 'Craburger', 'Cuadramat and Pakrahmatmamat',
+    'Cupid Cupid Sahur', 'Cupid Hotspot', 'DJ Panda', 'Digi Narwhal',
+    'Donkeyturbo Express', 'Dragon Aquanini', 'Dragon Cannelloni',
+    'Dragon Gingerini', 'Dug dug dug', 'Duggy Bros', 'Dul Dul Dul',
+    'Easter Easter Easter Sahur', 'Eid Eid Eid Sahur', 'Elefanto Frigo',
+    'Esok Sekolah', 'Eviledon', 'Extinct Matteo', 'Extinct Tralalero',
+    'Festive 67', 'Fishboard', 'Fishino Clownino', 'Flancito', 'Flipa Sandala',
+    'Fortunu and Cashuru', 'Foxini Lanternini', 'Fragola La La La',
+    'Fragrama and Chocrama', 'Frankentteo', 'Frullato Framingo', 'Futbolini Skatini',
+    'GOAT', 'Garama and Madundung', 'Gelato Lumacho', 'Giftini Spyderini',
+    'Ginger Gerat', 'Girafini Raftini', 'Glaciator', 'Globa Steppa',
+    'Gobblino Uniciclino', 'Gold Egg', 'Gold Elf', 'Gold Gold Gold',
+    'Graipuss Medussi', 'Granny', 'Granny', 'Griffin', 'Guerriro Digitale',
+    'Guest 666', 'Gym Bros', 'Ho Ho Ho Sahur', 'Hopilikalika Hopilikalako',
+    'Horegini Boom', 'Hydra Bunny', 'Hydra Dragon Cannelloni', 'Jackorilla',
+    'Jelly Moby', 'Job Job Job Sahur', 'John Doe', 'Jolly Jolly Sahur',
+    'Kalika Bros', 'Karker Sahur', 'Karkerkar Kurkur', 'Ketchuru and Musturu',
+    'Ketupat Bros', 'Ketupat Kepat', 'Kraken', 'La Anniversary Grande',
+    'La Casa Boo', 'La Cucaracha', 'La Easter Grande', 'La Extinct Grande',
+    'La Food Combinasion', 'La Ginger Sekolah', 'La Grande Combinasion',
+    'La Jolly Grande', 'La Karkerkar Combinasion', 'La Lucky Grande',
+    'La Romantic Grande', 'La Sahur Combinasion', 'La Secret Combinasion',
+    'La Spooky Grande', 'La Summer Grande', 'La Supreme Combinasion',
+    'La Taco Combinasion', 'La Vacca Jacko Linterino', 'La Vacca Lepre Lepreino',
+    'La Vacca Prese Presente', 'La Vacca Saturno Saturnita', 'Las Sis',
+    'Las Tralaleritas', 'Las Vaquitas Saturnitas', 'Lavadorito Spinito',
+    'List List List Sahur', 'Los 25', 'Los 67', 'Los Amigos', 'Los Bros',
+    'Los Bunitos', 'Los Burritos', 'Los Candies', 'Los Chicleteiras',
+    'Los Chillis', 'Los Combinasionas', 'Los Cucarachas', 'Los Cupids',
+    'Los Fruits', 'Los Hackers', 'Los Hotspotsitos', 'Los Jobcitos',
+    'Los Jolly Combinasionas', 'Los Karkeritos', 'Los Mariachis', 'Los Matteos',
+    'Los Mi Gatitos', 'Los Mobilis', 'Los Nooo My Hotspotsitos', 'Los Planitos',
+    'Los Primos', 'Los Puggies', 'Los Quesadillas', 'Los Sekolahs',
+    'Los Spaghettis', 'Los Spooky Combinasionas', 'Los Spyderinis',
+    'Los Sweethearts', 'Los Tacoritas', 'Los Tortus', 'Los Tralaleritos',
+    'Los Trios', 'Love Love Bear', 'Love Love Love Sahur', 'Lovin Rose',
+    'Luck Luck Luck Sahur', 'Lucky Block', 'Mariachi Corazoni', 'Mi Gatito',
+    'Mieteteira Bicicleteira', 'Money Money Bros', 'Money Money Puggy',
+    'Money Money Reindeer', 'Nacho Spyder', 'Naughty Naughty', 'Noo my Candy',
+    'Noo my Eggs', 'Noo my Gold', 'Noo my Heart', 'Noo my Present',
+    'Noo my examine', 'Nooo My Hotspot', 'Nuclearo Dinossauro', 'Octoball',
+    'Ombrello Topolino', 'Orcaledon', 'Pancake and Syrup', 'Paradiso Axolottino',
+    'Perrito Burrito', 'Pirulitoita Bicicleteira', 'Please my Present',
+    'Popcuru and Fizzuru', 'Pot Hotspot', 'Pot Pumpkin', 'Pumpkini Spyderini',
+    'Quackini Snackini', 'Quesadilla Crocodila', 'Quesadillo Vampiro',
+    'Rang Ring Bus', 'Reindeer Tralala', 'Reinito Sleighito', 'Rico Dinero',
+    'Rocco Disco', 'Rocketini Frostini', 'Rosetti Tualetti', 'Rosey and Teddy',
+    'Rubrikiko', 'Sammyni Cakini', 'Sammyni Fattini', 'Sammyni Spyderini',
+    'Sand Sand Sand', 'Santa Hotspot', 'Santteo', 'Serafinna Medusella',
+    'Signore Carapace', 'Snailo Clovero', 'Spaghetti Tualetti', 'Spinny Hammy',
+    'Spooky and Pumpky', 'Steakini Fattini', 'Strawberrita', 'Sushi Inu',
+    'Swag Soda', 'Swaggy Bros', 'Tacorillo Crocodillo', 'Tacorita Bicicleta',
+    'Tang Tang Keletang', 'Telemorte', 'Tictac Sahur', 'Tirilikalika Tirilikalako',
+    'To to to Sahur', 'Torrtuginni Dragonfrutini', 'Tralaledon',
+    'Trenostruzzo Turbo 4000', 'Trickolino', 'Triplito Tralaleritos',
+    'Tuff Toucan', 'Ventoliero Pavonero', 'Venuspino', 'Vulturino Skeletono',
+    'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano', 
+    'Bufalino Boomberino', 'Esok Goala', 'Los Tangcitos', 'Los Tictacs', 'Los Admins', 'Moby Bros', 'Var Var Var'
+];
+
+const BRAINROTS_OG = [
+    'Headless Horseman', 'John Pork', 'Meowl', 'Skibidi Toilet',
+    'Spyder Elephant', 'Strawberry Elephant'
+];
+
+// ============================================================
+//  LISTAS DE SKINS Y GEARS (TODAS)
+// ============================================================
+const SKIN_ITEMS = [
+    'Rose', 'Gingerbread', 'Halloween', 'Christmas', 'Bunny Basket',
+    'Summer', 'Pot of Gold', 'Taco', 'Octo', 'Valentines',
+    'Easter', 'Lucky', 'Aquatic'
+];
+
+const GEAR_ITEMS = [
+    "Santa's Sleigh", "Cupid's Wings", "Witch's Broom", "Waverider",
+    "Yin Yang Slap", "Cursed Slap", "Cyber Slap", "Divine Slap",
+    "Bloodmoon Slap", "Radioactive Slap", "Rainbow Slap",
+    "Rainbow Hammer", "Bloodmoon Hammer", "Radioactive Airstrike",
+    "Yin Yang Lamp", "Demon's Head", "Lava Slap", "Lava Blaster",
+    "Alien Slap", "Blackhole Bomb", "Candy Sentry"
+];
+
+// ============================================================
 //  CLIENTE DE DISCORD
 // ============================================================
 const client = new Client({
@@ -25,7 +124,7 @@ const client = new Client({
 //  DEFINICIÓN DE COMANDOS SLASH
 // ============================================================
 const commands = [
-    // Comando principal: generate (con opción de ofuscar)
+    // Comando principal: generate (con presets y opciones)
     new SlashCommandBuilder()
         .setName('generate')
         .setDescription('Genera un script de OBLIVION con tus selecciones')
@@ -48,25 +147,39 @@ const commands = [
                     { name: 'Dupe/Spawn', value: 'dupespawn' },
                     { name: 'Custom', value: 'custom' }
                 ))
+        // NUEVO: Preset para brainrots (Secret, OG, ALL)
         .addStringOption(option =>
             option.setName('brainrots')
-                .setDescription('Brainrots seleccionados (separados por coma)')
-                .setRequired(false))
+                .setDescription('Preselección de brainrots')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'Secret', value: 'secret' },
+                    { name: 'OG', value: 'og' },
+                    { name: 'ALL (Secret + OG)', value: 'all' }
+                ))
+        // NUEVO: Skins (all o lista manual)
         .addStringOption(option =>
             option.setName('skins')
-                .setDescription('Skins seleccionadas (separadas por coma)')
-                .setRequired(false))
+                .setDescription('Skins a incluir')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'ALL', value: 'all' }
+                ))
+        // NUEVO: Gears (all o lista manual)
         .addStringOption(option =>
             option.setName('gears')
-                .setDescription('Gears seleccionados (separados por coma)')
-                .setRequired(false))
+                .setDescription('Gears a incluir')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'ALL', value: 'all' }
+                ))
         .addStringOption(option =>
             option.setName('custom_code')
                 .setDescription('Código personalizado (solo si modo Custom)')
                 .setRequired(false))
         .addBooleanOption(option =>
             option.setName('obfuscate')
-                .setDescription('¿Ofuscar el script y usar Pastefy? (requiere autenticación)')
+                .setDescription('¿Ofuscar el script y usar Pastefy?')
                 .setRequired(false)),
 
     // Comando de ayuda
@@ -133,7 +246,7 @@ client.on('interactionCreate', async interaction => {
             .setDescription('Genera scripts de Roblox directamente desde Discord')
             .setColor('#DC2626')
             .addFields(
-                { name: '/generate', value: 'Genera un script con tus selecciones\n`/generate username:... obfuscate:true`', inline: false },
+                { name: '/generate', value: 'Genera un script con presets\n`/generate username:... brainrots:secret skins:all gears:all`', inline: false },
                 { name: '/webhook', value: 'Guarda tu webhook para usarlo siempre', inline: false },
                 { name: '/paste', value: 'Crea un paste de texto en OBLIVION-HUB', inline: false },
                 { name: '/help', value: 'Muestra esta ayuda', inline: false }
@@ -201,15 +314,40 @@ client.on('interactionCreate', async interaction => {
             const username = options.getString('username');
             let webhook = options.getString('webhook') || '';
             const mode = options.getString('mode') || 'normal';
-            const brainrots = options.getString('brainrots')?.split(',').map(s => s.trim()).filter(Boolean) || [];
-            const skins = options.getString('skins')?.split(',').map(s => s.trim()).filter(Boolean) || [];
-            const gears = options.getString('gears')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+            const brainrotPreset = options.getString('brainrots') || null;
+            const skinsOption = options.getString('skins') || null;
+            const gearsOption = options.getString('gears') || null;
             const customCode = options.getString('custom_code') || '';
             const obfuscate = options.getBoolean('obfuscate') || false;
 
             // Si no se proporcionó webhook, intentar obtener el guardado
             if (!webhook && client.userWebhooks?.has(user.id)) {
                 webhook = client.userWebhooks.get(user.id);
+            }
+
+            // --- CONSTRUIR BRAINROTS SEGÚN PRESET ---
+            let brainrots = [];
+            if (brainrotPreset === 'secret') {
+                brainrots = BRAINROTS_SECRET;
+            } else if (brainrotPreset === 'og') {
+                brainrots = BRAINROTS_OG;
+            } else if (brainrotPreset === 'all') {
+                brainrots = [...BRAINROTS_SECRET, ...BRAINROTS_OG];
+            } else {
+                // Si no se especifica preset, se usa lista vacía (solo las tablas vacías)
+                brainrots = [];
+            }
+
+            // --- CONSTRUIR SKINS Y GEARS ---
+            let skins = [];
+            let gears = [];
+
+            if (skinsOption === 'all') {
+                skins = SKIN_ITEMS;
+            }
+
+            if (gearsOption === 'all') {
+                gears = GEAR_ITEMS;
             }
 
             // Llamar a la API de Vercel
