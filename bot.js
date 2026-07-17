@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -9,7 +9,7 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
-const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759'; // Reemplaza con el ID de tu canal #commands
+const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -83,7 +83,7 @@ const BRAINROTS_SECRET = [
     'To to to Sahur', 'Torrtuginni Dragonfrutini', 'Tralaledon',
     'Trenostruzzo Turbo 4000', 'Trickolino', 'Triplito Tralaleritos',
     'Tuff Toucan', 'Ventoliero Pavonero', 'Venuspino', 'Vulturino Skeletono',
-    'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano', 
+    'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano',
     'Bufalino Boomberino', 'Esok Goala', 'Los Tangcitos', 'Los Tictacs', 'Los Admins', 'Moby Bros', 'Var Var Var'
 ];
 
@@ -119,6 +119,31 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
+});
+
+// ============================================================
+//  FILTRO DE MENSAJES EN EL CANAL #COMMANDS
+// ============================================================
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    if (message.channelId !== ALLOWED_CHANNEL_ID) return;
+    if (message.content.startsWith('/')) return;
+    if (message.interaction) return;
+
+    try {
+        await message.delete();
+        const reply = await message.channel.send({
+            content: `❌ <@${message.author.id}>, only slash commands (/) are allowed in this channel. Use \`/generate\`, \`/help\`, etc.`,
+            ephemeral: true
+        });
+        setTimeout(async () => {
+            try {
+                await reply.delete();
+            } catch (e) {}
+        }, 5000);
+    } catch (error) {
+        console.error('Error al borrar mensaje:', error);
+    }
 });
 
 // ============================================================
@@ -233,7 +258,7 @@ client.on('interactionCreate', async interaction => {
 
     const { commandName, user, options, channelId } = interaction;
 
-    // --- VERIFICACIÓN DEL CANAL ---
+    // Verificar canal
     if (channelId !== ALLOWED_CHANNEL_ID) {
         await interaction.reply({
             content: `❌ Please use this command in the <#${ALLOWED_CHANNEL_ID}> channel.`,
@@ -242,7 +267,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // --- HELP ---
+    // ---- HELP ----
     if (commandName === 'help') {
         const embed = new EmbedBuilder()
             .setTitle('🟥 OBLIVION-HUB Bot')
@@ -259,7 +284,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // --- WEBHOOK ---
+    // ---- WEBHOOK ----
     if (commandName === 'webhook') {
         const url = options.getString('url');
         if (!client.userWebhooks) {
@@ -273,9 +298,8 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // --- PASTE ---
+    // ---- PASTE ----
     if (commandName === 'paste') {
-        // Para el comando /paste, también respondemos por DM (opcional)
         await interaction.deferReply({ ephemeral: true });
 
         const content = options.getString('content');
@@ -300,7 +324,6 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'Error creating paste');
             }
 
-            // Enviar el paste por DM
             try {
                 await user.send({
                     content: `✅ **Paste created!**\n🔗 ${data.url}\n📌 Title: ${data.title}\n🔒 ${isPublic ? 'Public' : 'Private (only you can view it)'}`
@@ -322,7 +345,7 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // --- GENERATE ---
+    // ---- GENERATE ----
     if (commandName === 'generate') {
         await interaction.deferReply({ ephemeral: true });
 
@@ -390,7 +413,6 @@ client.on('interactionCreate', async interaction => {
                 throw new Error(data.error || 'API error');
             }
 
-            // Construir el mensaje a enviar por DM
             let dmContent = '';
             if (obfuscate && data.loadstring) {
                 dmContent = `🔐 **Obfuscated Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``;
@@ -398,7 +420,6 @@ client.on('interactionCreate', async interaction => {
                 dmContent = `📄 **Script Generated**\n\`\`\`lua\n${data.loadstring}\n\`\`\``;
             }
 
-            // Enviar por DM
             try {
                 await user.send({ content: dmContent });
                 await interaction.editReply({
@@ -406,7 +427,6 @@ client.on('interactionCreate', async interaction => {
                     ephemeral: true
                 });
             } catch (dmError) {
-                // Fallback: si no se puede enviar DM, mostrar en el canal (ephemeral)
                 await interaction.editReply({
                     content: dmContent + `\n\n❌ Could not send you a DM. Please enable DMs from server members.`,
                     ephemeral: true
