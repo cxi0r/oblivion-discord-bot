@@ -1,7 +1,8 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
-const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================
 //  CONFIGURACIÓN DE ENTORNO
@@ -15,10 +16,30 @@ const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
 const BOT_OWNER_ID = '1427070113017761833';
 
-// Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// ============================================================
+//  PERSISTENCIA EN ARCHIVO JSON
+// ============================================================
+const DATA_FILE = path.join(__dirname, 'webhooks.json');
+
+function loadWebhooks() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const data = fs.readFileSync(DATA_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.error('Error loading webhooks:', error);
+    }
+    return {};
+}
+
+function saveWebhooks(webhooks) {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(webhooks, null, 2));
+    } catch (error) {
+        console.error('Error saving webhooks:', error);
+    }
+}
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -129,40 +150,6 @@ const client = new Client({
         GatewayIntentBits.MessageContent
     ]
 });
-
-// ============================================================
-//  FUNCIONES PARA SUPABASE
-// ============================================================
-async function getUserWebhook(userId) {
-    const { data, error } = await supabase
-        .from('user_webhooks')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-    if (error) return null;
-    return data;
-}
-
-async function saveUserWebhook(userId, channelId, webhookUrl, webhookId) {
-    const { error } = await supabase
-        .from('user_webhooks')
-        .upsert({
-            user_id: userId,
-            channel_id: channelId,
-            webhook_url: webhookUrl,
-            webhook_id: webhookId,
-            created_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-    if (error) console.error('Error saving webhook:', error);
-}
-
-async function deleteUserWebhook(userId) {
-    const { error } = await supabase
-        .from('user_webhooks')
-        .delete()
-        .eq('user_id', userId);
-    if (error) console.error('Error deleting webhook:', error);
-}
 
 // ============================================================
 //  FILTRO DE MENSAJES EN EL CANAL #COMMANDS
@@ -386,8 +373,15 @@ async function createNewWebhook(guild, user, category, interaction) {
         avatar: user.displayAvatarURL(),
     });
 
-    // Guardar en Supabase
-    await saveUserWebhook(user.id, newChannel.id, webhook.url, webhook.id);
+    // Guardar en archivo JSON
+    const webhooks = loadWebhooks();
+    webhooks[user.id] = {
+        channelId: newChannel.id,
+        webhookUrl: webhook.url,
+        webhookId: webhook.id,
+        createdAt: Date.now()
+    };
+    saveWebhooks(webhooks);
 
     // Mensaje de éxito con botón para copiar
     const successMessage = 
@@ -463,7 +457,8 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-            const webhookData = await getUserWebhook(userId);
+            const webhooks = loadWebhooks();
+            const webhookData = webhooks[userId];
             if (!webhookData) {
                 await interaction.reply({
                     content: '❌ Webhook not found. It may have been deleted.',
@@ -472,7 +467,7 @@ client.on('interactionCreate', async interaction => {
                 return;
             }
 
-            const url = webhookData.webhook_url;
+            const url = webhookData.webhookUrl;
             await interaction.reply({
                 content: `📋 **Webhook URL**\n\`\`\`\n${url}\n\`\`\``,
                 ephemeral: true
@@ -516,8 +511,9 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                // Verificar si el usuario ya tiene un webhook (desde Supabase)
-                const existingData = await getUserWebhook(user.id);
+                // Verificar si el usuario ya tiene un webhook (desde archivo JSON)
+                const webhooks = loadWebhooks();
+                const existingData = webhooks[user.id];
 
                 if (existingData) {
                     // Mostrar mensaje de confirmación con botones
@@ -573,15 +569,18 @@ client.on('interactionCreate', async interaction => {
 
                             // Eliminar webhook anterior
                             try {
-                                const oldChannel = guild.channels.cache.get(existingData.channel_id);
+                                const oldChannel = guild.channels.cache.get(existingData.channelId);
                                 if (oldChannel) {
-                                    const webhooks = await oldChannel.fetchWebhooks();
-                                    for (const [id, webhook] of webhooks) {
+                                    const webhooksList = await oldChannel.fetchWebhooks();
+                                    for (const [id, webhook] of webhooksList) {
                                         await webhook.delete();
                                     }
                                     await oldChannel.delete();
                                 }
-                                await deleteUserWebhook(user.id);
+                                // Eliminar del archivo
+                                const updatedWebhooks = loadWebhooks();
+                                delete updatedWebhooks[user.id];
+                                saveWebhooks(updatedWebhooks);
                             } catch (error) {
                                 console.error('Error al eliminar webhook anterior:', error);
                             }
