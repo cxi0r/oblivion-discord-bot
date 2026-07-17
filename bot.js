@@ -9,7 +9,7 @@ const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
-const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || 'ID_DEL_CANAL_COMMANDS'; // Reemplaza con el ID de tu canal #commands
+const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759'; // Reemplaza con el ID de tu canal #commands
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
