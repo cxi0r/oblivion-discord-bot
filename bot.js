@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const express = require('express');
 const fetch = require('node-fetch');
 
@@ -12,7 +12,7 @@ const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
 const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
-const BOT_OWNER_ID = '1427070113017761833'; // ⚠️ CORREGIDO: sin la 'D'
+const BOT_OWNER_ID = '1427070113017761833';
 
 // ============================================================
 //  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
@@ -296,154 +296,96 @@ client.on('interactionCreate', async interaction => {
                 // Verificar si el usuario ya tiene un webhook
                 const existingData = userWebhooks.get(user.id);
                 if (existingData) {
+                    // --- Mostrar mensaje de confirmación con botones ---
                     const warningMessage = 
-                        `⚠️ **ENGLISH:** You already have a webhook. If you create a new one, your existing webhook will be automatically deleted and replaced.\n\n` +
-                        `⚠️ **ESPAÑOL:** Ya tienes un webhook. Si creas uno nuevo, tu webhook existente será eliminado automáticamente y reemplazado.`;
+                        `⚠️ **ENGLISH:** You already have a webhook. Do you want to replace it with a new one?\n\n` +
+                        `⚠️ **ESPAÑOL:** Ya tienes un webhook. ¿Quieres reemplazarlo por uno nuevo?`;
+
+                    const row = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setCustomId('webhook_accept')
+                                .setLabel('✅ Accept')
+                                .setStyle(ButtonStyle.Success),
+                            new ButtonBuilder()
+                                .setCustomId('webhook_cancel')
+                                .setLabel('❌ Cancel')
+                                .setStyle(ButtonStyle.Danger)
+                        );
 
                     await interaction.editReply({
                         content: warningMessage,
+                        components: [row],
                         ephemeral: true
                     });
 
-                    try {
-                        const oldChannel = guild.channels.cache.get(existingData.channelId);
-                        if (oldChannel) {
-                            const webhooks = await oldChannel.fetchWebhooks();
-                            for (const [id, webhook] of webhooks) {
-                                await webhook.delete();
-                            }
-                            await oldChannel.delete();
+                    // Esperar la interacción del botón
+                    const filter = i => i.user.id === user.id && ['webhook_accept', 'webhook_cancel'].includes(i.customId);
+                    const collector = interaction.channel.createMessageComponentCollector({
+                        filter,
+                        time: 60000, // 60 segundos
+                        max: 1,
+                    });
+
+                    let handled = false;
+
+                    collector.on('collect', async buttonInteraction => {
+                        handled = true;
+                        if (buttonInteraction.customId === 'webhook_cancel') {
+                            await buttonInteraction.update({
+                                content: `❌ **Cancelled.** Your existing webhook has not been changed. / **Cancelado.** Tu webhook existente no ha sido modificado.`,
+                                components: [],
+                                ephemeral: true
+                            });
+                            return;
                         }
-                        userWebhooks.delete(user.id);
-                    } catch (error) {
-                        console.error('Error al eliminar webhook anterior:', error);
-                    }
-                }
 
-                // Obtener el siguiente número disponible
-                const existingChannels = category.children.cache
-                    .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'))
-                    .sort((a, b) => {
-                        const numA = parseInt(a.name.split('-')[1]) || 0;
-                        const numB = parseInt(b.name.split('-')[1]) || 0;
-                        return numA - numB;
+                        if (buttonInteraction.customId === 'webhook_accept') {
+                            // Desactivar los botones
+                            await buttonInteraction.update({
+                                content: `⏳ **Processing...** Deleting your existing webhook and creating a new one. / **Procesando...** Eliminando tu webhook existente y creando uno nuevo.`,
+                                components: [],
+                                ephemeral: true
+                            });
+
+                            // Eliminar webhook anterior
+                            try {
+                                const oldChannel = guild.channels.cache.get(existingData.channelId);
+                                if (oldChannel) {
+                                    const webhooks = await oldChannel.fetchWebhooks();
+                                    for (const [id, webhook] of webhooks) {
+                                        await webhook.delete();
+                                    }
+                                    await oldChannel.delete();
+                                }
+                                userWebhooks.delete(user.id);
+                            } catch (error) {
+                                console.error('Error al eliminar webhook anterior:', error);
+                            }
+
+                            // Crear nuevo webhook (reutilizar lógica)
+                            await createNewWebhook(guild, user, category, buttonInteraction);
+                            return;
+                        }
                     });
 
-                let nextNumber = 1;
-                for (const channel of existingChannels.values()) {
-                    const num = parseInt(channel.name.split('-')[1]) || 0;
-                    if (num >= nextNumber) {
-                        nextNumber = num + 1;
-                    }
-                }
-
-                if (nextNumber > MAX_WEBHOOKS) {
-                    await interaction.editReply({
-                        content: `❌ Maximum number of webhook channels (${MAX_WEBHOOKS}) reached.`,
-                        ephemeral: true
+                    collector.on('end', async (collected, reason) => {
+                        if (!handled && reason === 'time') {
+                            // Timeout: desactivar botones
+                            await interaction.editReply({
+                                content: `⏰ **Timeout.** The request has expired. Please try again. / **Tiempo agotado.** La solicitud ha expirado. Vuelve a intentarlo.`,
+                                components: [],
+                                ephemeral: true
+                            });
+                        }
                     });
+
+                    // Salir del flujo actual, ya que la confirmación maneja el resto
                     return;
                 }
 
-                const channelName = `webhook-${nextNumber}`;
-
-                // --- Obtener el dueño del bot y el usuario en caché ---
-                const ownerUser = await guild.members.fetch(BOT_OWNER_ID).catch(() => null);
-                const botMember = guild.members.cache.get(client.user.id);
-                const userMember = await guild.members.fetch(user.id).catch(() => null);
-
-                // Construir permisos dinámicamente
-                const permissionOverwrites = [
-                    {
-                        id: guild.id, // @everyone
-                        deny: [PermissionsBitField.Flags.ViewChannel],
-                    }
-                ];
-
-                if (userMember) {
-                    permissionOverwrites.push({
-                        id: user.id,
-                        allow: [
-                            PermissionsBitField.Flags.ViewChannel,
-                            PermissionsBitField.Flags.SendMessages,
-                            PermissionsBitField.Flags.ReadMessageHistory,
-                            PermissionsBitField.Flags.AttachFiles,
-                            PermissionsBitField.Flags.EmbedLinks,
-                        ],
-                    });
-                }
-
-                if (ownerUser) {
-                    permissionOverwrites.push({
-                        id: BOT_OWNER_ID,
-                        allow: [
-                            PermissionsBitField.Flags.ViewChannel,
-                            PermissionsBitField.Flags.SendMessages,
-                            PermissionsBitField.Flags.ReadMessageHistory,
-                            PermissionsBitField.Flags.ManageChannels,
-                            PermissionsBitField.Flags.ManageMessages,
-                        ],
-                    });
-                }
-
-                if (botMember) {
-                    permissionOverwrites.push({
-                        id: client.user.id,
-                        allow: [
-                            PermissionsBitField.Flags.ViewChannel,
-                            PermissionsBitField.Flags.SendMessages,
-                            PermissionsBitField.Flags.ReadMessageHistory,
-                            PermissionsBitField.Flags.ManageMessages,
-                            PermissionsBitField.Flags.ManageWebhooks,
-                        ],
-                    });
-                }
-
-                const newChannel = await guild.channels.create({
-                    name: channelName,
-                    type: ChannelType.GuildText,
-                    parent: WEBHOOK_CATEGORY_ID,
-                    permissionOverwrites: permissionOverwrites,
-                });
-
-                // Crear webhook
-                const webhook = await newChannel.createWebhook({
-                    name: `webhook-${user.username}`,
-                    avatar: user.displayAvatarURL(),
-                });
-
-                // Guardar referencia
-                userWebhooks.set(user.id, {
-                    channelId: newChannel.id,
-                    webhookUrl: webhook.url,
-                    webhookId: webhook.id,
-                    createdAt: Date.now(),
-                });
-
-                const successMessage = 
-                    `✅ **ENGLISH:** Your webhook channel has been created successfully!\n` +
-                    `📁 Channel: <#${newChannel.id}>\n` +
-                    `🔗 Webhook URL: ||${webhook.url}||\n\n` +
-                    `📌 **SPANISH:** ¡Tu canal de webhook ha sido creado exitosamente!\n` +
-                    `📁 Canal: <#${newChannel.id}>\n` +
-                    `🔗 URL del Webhook: ||${webhook.url}||\n\n` +
-                    `⚠️ Only you and the bot owner can see this channel. / Solo tú y el dueño del bot pueden ver este canal.`;
-
-                try {
-                    await user.send({ content: successMessage });
-                } catch (dmError) {}
-
-                await interaction.editReply({
-                    content: successMessage,
-                    ephemeral: true
-                });
-
-                await newChannel.send({
-                    content: `🔔 **${user.username}**, this is your personal webhook channel.\n\n` +
-                             `📌 Only you and the bot owner can see this channel.\n` +
-                             `🔗 Your webhook URL: ||${webhook.url}||\n\n` +
-                             `⚠️ Keep this URL private. Anyone with this URL can send messages to this channel.`
-                });
+                // Si no tiene webhook, crear uno directamente
+                await createNewWebhook(guild, user, category, interaction);
 
             } catch (error) {
                 console.error('Error al crear webhook:', error);
@@ -610,6 +552,144 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 });
+
+// ============================================================
+//  FUNCIÓN AUXILIAR PARA CREAR WEBHOOK
+// ============================================================
+async function createNewWebhook(guild, user, category, interaction) {
+    // Obtener el siguiente número disponible
+    const existingChannels = category.children.cache
+        .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'))
+        .sort((a, b) => {
+            const numA = parseInt(a.name.split('-')[1]) || 0;
+            const numB = parseInt(b.name.split('-')[1]) || 0;
+            return numA - numB;
+        });
+
+    let nextNumber = 1;
+    for (const channel of existingChannels.values()) {
+        const num = parseInt(channel.name.split('-')[1]) || 0;
+        if (num >= nextNumber) {
+            nextNumber = num + 1;
+        }
+    }
+
+    if (nextNumber > MAX_WEBHOOKS) {
+        await interaction.editReply({
+            content: `❌ Maximum number of webhook channels (${MAX_WEBHOOKS}) reached.`,
+            ephemeral: true
+        });
+        return;
+    }
+
+    const channelName = `webhook-${nextNumber}`;
+
+    // Obtener usuarios en caché
+    const ownerUser = await guild.members.fetch(BOT_OWNER_ID).catch(() => null);
+    const botMember = guild.members.cache.get(client.user.id);
+    const userMember = await guild.members.fetch(user.id).catch(() => null);
+
+    const permissionOverwrites = [
+        {
+            id: guild.id,
+            deny: [PermissionsBitField.Flags.ViewChannel],
+        }
+    ];
+
+    if (userMember) {
+        permissionOverwrites.push({
+            id: user.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+                PermissionsBitField.Flags.EmbedLinks,
+            ],
+        });
+    }
+
+    if (ownerUser) {
+        permissionOverwrites.push({
+            id: BOT_OWNER_ID,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageChannels,
+                PermissionsBitField.Flags.ManageMessages,
+            ],
+        });
+    }
+
+    if (botMember) {
+        permissionOverwrites.push({
+            id: client.user.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageMessages,
+                PermissionsBitField.Flags.ManageWebhooks,
+            ],
+        });
+    }
+
+    const newChannel = await guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        parent: WEBHOOK_CATEGORY_ID,
+        permissionOverwrites: permissionOverwrites,
+    });
+
+    const webhook = await newChannel.createWebhook({
+        name: `webhook-${user.username}`,
+        avatar: user.displayAvatarURL(),
+    });
+
+    // Guardar referencia
+    const userWebhooks = global.userWebhooks || new Map();
+    userWebhooks.set(user.id, {
+        channelId: newChannel.id,
+        webhookUrl: webhook.url,
+        webhookId: webhook.id,
+        createdAt: Date.now(),
+    });
+    global.userWebhooks = userWebhooks;
+
+    // Mensaje de éxito bilingüe
+    const successMessage = 
+        `✅ **ENGLISH:** Your webhook channel has been created successfully!\n` +
+        `📁 Channel: <#${newChannel.id}>\n` +
+        `🔗 Webhook URL: ${webhook.url}\n\n` +
+        `📌 **SPANISH:** ¡Tu canal de webhook ha sido creado exitosamente!\n` +
+        `📁 Canal: <#${newChannel.id}>\n` +
+        `🔗 URL del Webhook: ${webhook.url}\n\n` +
+        `⚠️ Only you and the bot owner can see this channel. / Solo tú y el dueño del bot pueden ver este canal.`;
+
+    // Enviar por DM
+    try {
+        await user.send({ content: successMessage });
+    } catch (dmError) {}
+
+    // Responder en el canal
+    await interaction.editReply({
+        content: successMessage,
+        ephemeral: true
+    });
+
+    // Mensaje de bienvenida en el canal webhook (bilingüe)
+    await newChannel.send({
+        content: 
+            `🔔 **${user.username}**, this is your personal webhook channel.\n\n` +
+            `📌 **ENGLISH:** Only you and the bot owner can see this channel.\n` +
+            `🔗 Your webhook URL: ${webhook.url}\n` +
+            `⚠️ Keep this URL private. Anyone with this URL can send messages to this channel.\n\n` +
+            `📌 **SPANISH:** Solo tú y el dueño del bot pueden ver este canal.\n` +
+            `🔗 Tu URL del webhook: ${webhook.url}\n` +
+            `⚠️ Mantén esta URL privada. Cualquiera con esta URL puede enviar mensajes a este canal.`
+    });
+}
 
 // ============================================================
 //  INICIAR EL BOT
