@@ -15,6 +15,7 @@ const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '152759125502932175
 const WEBHOOK_CATEGORY_ID = '1527769313040269322';
 const MAX_WEBHOOKS = 350;
 const BOT_OWNER_ID = '1427070113017761833';
+const PORT = process.env.PORT || 10000;
 
 // ============================================================
 //  PERSISTENCIA EN ARCHIVO JSON
@@ -782,12 +783,48 @@ client.login(TOKEN);
 //  SERVIDOR HTTP PARA MANTENER EL WEB SERVICE ACTIVO
 // ============================================================
 const app = express();
-const port = process.env.PORT || 10000;
+const port = PORT;
 
+// Endpoint principal
 app.get('/', (req, res) => {
     res.send('🤖 OBLIVION-HUB Bot is running correctly.');
 });
 
-app.listen(port, '0.0.0.0', () => {
+// Endpoint para ping (UptimeRobot / cron-job.org)
+app.get('/ping', (req, res) => {
+    res.send('pong');
+});
+
+// Iniciar servidor
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`✅ HTTP server listening on port ${port}`);
+});
+
+// ============================================================
+//  KEEP-ALIVE: PING INTERNO CADA 5 MINUTOS
+// ============================================================
+setInterval(() => {
+    const url = `http://localhost:${port}/ping`;
+    fetch(url)
+        .then(() => console.log('✅ Keep-alive ping exitoso'))
+        .catch(() => console.log('⚠️ Keep-alive ping fallido'));
+}, 300000); // 5 minutos
+
+// ============================================================
+//  MANEJO DE CIERRE GRACIOSO
+// ============================================================
+process.on('SIGTERM', () => {
+    console.log('🛑 Recibida señal SIGTERM, cerrando servidor...');
+    server.close(() => {
+        console.log('✅ Servidor cerrado correctamente.');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 Recibida señal SIGINT, cerrando servidor...');
+    server.close(() => {
+        console.log('✅ Servidor cerrado correctamente.');
+        process.exit(0);
+    });
 });
