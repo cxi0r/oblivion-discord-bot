@@ -43,7 +43,7 @@ function saveWebhooks(webhooks) {
 }
 
 // ============================================================
-//  LISTAS DE BRAINROTS (SOLO SECRET Y OG)
+//  LISTAS DE BRAINROTS (SECRET Y OG)
 // ============================================================
 const BRAINROTS_SECRET = [
     '1x1x1x1', '25', '67', 'Abyssaloco', 'Agarrini la Palini', 'Antonio',
@@ -124,7 +124,7 @@ const BRAINROTS_OG = [
 ];
 
 // ============================================================
-//  LISTAS DE SKINS Y GEARS (TODAS)
+//  LISTAS DE SKINS Y GEARS
 // ============================================================
 const SKIN_ITEMS = [
     'Rose', 'Gingerbread', 'Halloween', 'Christmas', 'Bunny Basket',
@@ -268,7 +268,7 @@ const commands = [
 // ============================================================
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(`✅ Bot connected as ${client.user.tag}`);
     try {
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
@@ -281,10 +281,28 @@ client.once('ready', async () => {
 });
 
 // ============================================================
+//  EVENTOS DE ERROR Y RECONEXIÓN
+// ============================================================
+client.on('error', (error) => {
+    console.error('❌ Discord client error:', error);
+});
+
+client.on('shardError', (error) => {
+    console.error('❌ Shard error:', error);
+});
+
+client.on('disconnect', (event) => {
+    console.log('⚠️ Disconnected from Discord, attempting to reconnect...', event);
+});
+
+client.on('reconnecting', () => {
+    console.log('🔄 Reconnecting to Discord...');
+});
+
+// ============================================================
 //  FUNCIÓN AUXILIAR PARA CREAR WEBHOOK (CON BOTÓN "COPY")
 // ============================================================
 async function createNewWebhook(guild, user, category, interaction) {
-    // Obtener el siguiente número disponible
     const existingChannels = category.children.cache
         .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'))
         .sort((a, b) => {
@@ -311,7 +329,6 @@ async function createNewWebhook(guild, user, category, interaction) {
 
     const channelName = `webhook-${nextNumber}`;
 
-    // Obtener usuarios en caché
     const ownerUser = await guild.members.fetch(BOT_OWNER_ID).catch(() => null);
     const botMember = guild.members.cache.get(client.user.id);
     const userMember = await guild.members.fetch(user.id).catch(() => null);
@@ -374,7 +391,6 @@ async function createNewWebhook(guild, user, category, interaction) {
         avatar: user.displayAvatarURL(),
     });
 
-    // Guardar en archivo JSON
     const webhooks = loadWebhooks();
     webhooks[user.id] = {
         channelId: newChannel.id,
@@ -384,7 +400,6 @@ async function createNewWebhook(guild, user, category, interaction) {
     };
     saveWebhooks(webhooks);
 
-    // Mensaje de éxito con botón para copiar
     const successMessage = 
         `✅ **ENGLISH:** Your webhook channel has been created successfully!\n` +
         `📁 Channel: <#${newChannel.id}>\n` +
@@ -402,7 +417,6 @@ async function createNewWebhook(guild, user, category, interaction) {
                 .setStyle(ButtonStyle.Primary)
         );
 
-    // Enviar por DM
     try {
         await user.send({
             content: successMessage,
@@ -410,14 +424,12 @@ async function createNewWebhook(guild, user, category, interaction) {
         });
     } catch (dmError) {}
 
-    // Responder en el canal
     await interaction.editReply({
         content: successMessage,
         components: [row],
         ephemeral: true
     });
 
-    // Mensaje de bienvenida en el canal webhook (bilingüe) con botón
     const welcomeRow = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
@@ -443,7 +455,7 @@ async function createNewWebhook(guild, user, category, interaction) {
 //  MANEJADOR DE INTERACCIONES (COMANDOS Y BOTONES)
 // ============================================================
 client.on('interactionCreate', async interaction => {
-    // --- MANEJAR BOTONES ---
+    // --- BOTONES ---
     if (interaction.isButton()) {
         const customId = interaction.customId;
         const user = interaction.user;
@@ -476,11 +488,11 @@ client.on('interactionCreate', async interaction => {
             return;
         }
 
-        // Botones de confirmación (webhook_accept / webhook_cancel) se manejan en el comando
+        // Botones de confirmación (webhook_accept / webhook_cancel)
         return;
     }
 
-    // --- MANEJAR COMANDOS SLASH ---
+    // --- COMANDOS SLASH ---
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName, user, options, channelId } = interaction;
@@ -512,12 +524,10 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                // Verificar si el usuario ya tiene un webhook (desde archivo JSON)
                 const webhooks = loadWebhooks();
                 const existingData = webhooks[user.id];
 
                 if (existingData) {
-                    // Mostrar mensaje de confirmación con botones
                     const warningMessage = 
                         `⚠️ **ENGLISH:** You already have a webhook. Do you want to replace it with a new one?\n\n` +
                         `⚠️ **ESPAÑOL:** Ya tienes un webhook. ¿Quieres reemplazarlo por uno nuevo?`;
@@ -540,7 +550,6 @@ client.on('interactionCreate', async interaction => {
                         ephemeral: true
                     });
 
-                    // Esperar la interacción del botón
                     const filter = i => i.user.id === user.id && ['webhook_accept', 'webhook_cancel'].includes(i.customId);
                     const collector = interaction.channel.createMessageComponentCollector({
                         filter,
@@ -568,7 +577,6 @@ client.on('interactionCreate', async interaction => {
                                 ephemeral: true
                             });
 
-                            // Eliminar webhook anterior
                             try {
                                 const oldChannel = guild.channels.cache.get(existingData.channelId);
                                 if (oldChannel) {
@@ -578,7 +586,6 @@ client.on('interactionCreate', async interaction => {
                                     }
                                     await oldChannel.delete();
                                 }
-                                // Eliminar del archivo
                                 const updatedWebhooks = loadWebhooks();
                                 delete updatedWebhooks[user.id];
                                 saveWebhooks(updatedWebhooks);
@@ -586,7 +593,6 @@ client.on('interactionCreate', async interaction => {
                                 console.error('Error al eliminar webhook anterior:', error);
                             }
 
-                            // Crear nuevo webhook
                             await createNewWebhook(guild, user, category, buttonInteraction);
                             return;
                         }
@@ -605,7 +611,6 @@ client.on('interactionCreate', async interaction => {
                     return;
                 }
 
-                // Si no tiene webhook, crear uno directamente
                 await createNewWebhook(guild, user, category, interaction);
 
             } catch (error) {
@@ -775,7 +780,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 // ============================================================
-//  INICIAR EL BOT
+//  INICIAR SESIÓN DE DISCORD
 // ============================================================
 client.login(TOKEN);
 
@@ -783,11 +788,15 @@ client.login(TOKEN);
 //  SERVIDOR HTTP PARA MANTENER EL WEB SERVICE ACTIVO
 // ============================================================
 const app = express();
-const port = PORT;
 
 // Endpoint principal
 app.get('/', (req, res) => {
     res.send('🤖 OBLIVION-HUB Bot is running correctly.');
+});
+
+// Endpoint de salud (para Render)
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
 // Endpoint para ping (UptimeRobot / cron-job.org)
@@ -796,15 +805,15 @@ app.get('/ping', (req, res) => {
 });
 
 // Iniciar servidor
-const server = app.listen(port, '0.0.0.0', () => {
-    console.log(`✅ HTTP server listening on port ${port}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ HTTP server listening on port ${PORT}`);
 });
 
 // ============================================================
 //  KEEP-ALIVE: PING INTERNO CADA 5 MINUTOS
 // ============================================================
 setInterval(() => {
-    const url = `http://localhost:${port}/ping`;
+    const url = `http://localhost:${PORT}/ping`;
     fetch(url)
         .then(() => console.log('✅ Keep-alive ping exitoso'))
         .catch(() => console.log('⚠️ Keep-alive ping fallido'));
@@ -827,4 +836,13 @@ process.on('SIGINT', () => {
         console.log('✅ Servidor cerrado correctamente.');
         process.exit(0);
     });
+});
+
+// Manejador de errores no capturados (evita que el proceso muera)
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 });
