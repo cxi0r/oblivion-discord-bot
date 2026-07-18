@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const express = require('express');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // Asegúrate de tenerlo
 const fs = require('fs');
 const path = require('path');
 
@@ -43,7 +43,7 @@ function saveWebhooks(webhooks) {
 }
 
 // ============================================================
-//  LISTAS DE BRAINROTS (SECRET Y OG)
+//  LISTAS DE BRAINROTS (SECRET Y OG) - Completas
 // ============================================================
 const BRAINROTS_SECRET = [
     '1x1x1x1', '25', '67', 'Abyssaloco', 'Agarrini la Palini', 'Antonio',
@@ -140,6 +140,49 @@ const GEAR_ITEMS = [
     "Yin Yang Lamp", "Demon's Head", "Lava Slap", "Lava Blaster",
     "Alien Slap", "Blackhole Bomb", "Candy Sentry"
 ];
+
+// ============================================================
+//  CREAR SERVIDOR EXPRESS PRIMERO (para que Render lo vea)
+// ============================================================
+const app = express();
+let isBotReady = false;
+let botStartError = null;
+
+// Middleware para logs
+app.use((req, res, next) => {
+    console.log(`[HTTP] ${req.method} ${req.path}`);
+    next();
+});
+
+// Endpoints de salud
+app.get('/', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        bot: isBotReady ? 'connected' : 'connecting',
+        uptime: process.uptime()
+    });
+});
+
+app.get('/health', (req, res) => {
+    if (botStartError) {
+        res.status(500).json({ status: 'error', error: botStartError.message });
+    } else {
+        res.status(200).json({ 
+            status: 'ok', 
+            bot: isBotReady ? 'connected' : 'connecting',
+            uptime: process.uptime()
+        });
+    }
+});
+
+app.get('/ping', (req, res) => {
+    res.send('pong');
+});
+
+// Iniciar servidor ANTES de conectar el bot (así Render ya ve que el puerto responde)
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ HTTP server listening on port ${PORT}`);
+});
 
 // ============================================================
 //  CLIENTE DE DISCORD
@@ -269,6 +312,7 @@ const commands = [
 const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 client.once('clientReady', async () => {
+    isBotReady = true;
     console.log(`✅ Bot connected as ${client.user.tag}`);
     try {
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
@@ -285,14 +329,17 @@ client.once('clientReady', async () => {
 // ============================================================
 client.on('error', (error) => {
     console.error('❌ Discord client error:', error);
+    botStartError = error;
 });
 
 client.on('shardError', (error) => {
     console.error('❌ Shard error:', error);
+    botStartError = error;
 });
 
 client.on('disconnect', (event) => {
     console.log('⚠️ Disconnected from Discord, attempting to reconnect...', event);
+    isBotReady = false;
 });
 
 client.on('reconnecting', () => {
@@ -782,31 +829,9 @@ client.on('interactionCreate', async interaction => {
 // ============================================================
 //  INICIAR SESIÓN DE DISCORD
 // ============================================================
-client.login(TOKEN);
-
-// ============================================================
-//  SERVIDOR HTTP PARA MANTENER EL WEB SERVICE ACTIVO
-// ============================================================
-const app = express();
-
-// Endpoint principal
-app.get('/', (req, res) => {
-    res.send('🤖 OBLIVION-HUB Bot is running correctly.');
-});
-
-// Endpoint de salud (para Render)
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', uptime: process.uptime() });
-});
-
-// Endpoint para ping (UptimeRobot / cron-job.org)
-app.get('/ping', (req, res) => {
-    res.send('pong');
-});
-
-// Iniciar servidor
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ HTTP server listening on port ${PORT}`);
+client.login(TOKEN).catch(err => {
+    console.error('❌ Error al iniciar sesión en Discord:', err);
+    botStartError = err;
 });
 
 // ============================================================
@@ -816,7 +841,7 @@ setInterval(() => {
     const url = `http://localhost:${PORT}/ping`;
     fetch(url)
         .then(() => console.log('✅ Keep-alive ping exitoso'))
-        .catch(() => console.log('⚠️ Keep-alive ping fallido'));
+        .catch((err) => console.log('⚠️ Keep-alive ping fallido:', err.message));
 }, 300000); // 5 minutos
 
 // ============================================================
@@ -838,7 +863,7 @@ process.on('SIGINT', () => {
     });
 });
 
-// Manejador de errores no capturados (evita que el proceso muera)
+// Manejadores de errores no capturados
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
 });
