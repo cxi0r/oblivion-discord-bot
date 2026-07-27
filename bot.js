@@ -115,7 +115,9 @@ const BRAINROTS_SECRET = [
     'Trenostruzzo Turbo 4000', 'Trickolino', 'Triplito Tralaleritos',
     'Tuff Toucan', 'Ventoliero Pavonero', 'Venuspino', 'Vulturino Skeletono',
     'W or L', 'Yess my examine', 'Zombie Tralala', '4th Bros', 'Capitano Americano',
-    'Bufalino Boomberino', 'Esok Goala', 'Los Tangcitos', 'Los Tictacs', 'Los Admins', 'Moby Bros', 'Var Var Var'
+    'Bufalino Boomberino', 'Esok Goala', 'Los Tangcitos', 'Los Tictacs', 'Los Admins', 'Moby Bros', 'Var Var Var',
+    'Noodle Noodle Poodle', 'Grabatron', 'Cangurato Gelato', 'Rubiko and Kubiko', 'Toro Españolo', 'Chicleteira Champeona',
+    'Examen Bros', 'Pizza and Ranch', 'Los Secret Combinasionas'
 ];
 
 const BRAINROTS_OG = [
@@ -127,9 +129,9 @@ const BRAINROTS_OG = [
 //  LISTAS DE SKINS Y GEARS
 // ============================================================
 const SKIN_ITEMS = [
-    'Rose', 'Gingerbread', 'Halloween', 'Christmas', 'Bunny Basket',
-    'Summer', 'Pot of Gold', 'Taco', 'Octo', 'Valentines',
-    'Easter', 'Lucky', 'Aquatic'
+        'Rose', 'Gingerbread', 'Halloween', 'Christmas', 'Bunny Basket',
+        'Summer', 'Pot of Gold', 'Taco', 'Octo', 'Valentines',
+        'Easter', 'Lucky', 'Aquatic', 'Tralalero'
 ];
 
 const GEAR_ITEMS = [
