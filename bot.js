@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const express = require('express');
-const fetch = require('node-fetch'); // Asegúrate de tenerlo
+const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,8 +12,8 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 const API_URL = process.env.API_URL || 'https://oblivionhub.xyz';
 const ALLOWED_CHANNEL_ID = process.env.ALLOWED_CHANNEL_ID || '1527591255029321759';
-const WEBHOOK_CATEGORY_ID = '1527769313040269322';
-const MAX_WEBHOOKS = 350;
+// Eliminamos WEBHOOK_CATEGORY_ID fija
+const MAX_CHANNELS_PER_CATEGORY = 50; // Nuevo límite por categoría
 const BOT_OWNER_ID = '1427070113017761833';
 const PORT = process.env.PORT || 10000;
 
@@ -198,6 +198,75 @@ const client = new Client({
 });
 
 // ============================================================
+//  FUNCIÓN PARA OBTENER O CREAR CATEGORÍA DINÁMICA
+// ============================================================
+async function getOrCreateWebhookCategory(guild) {
+    // Buscar categorías existentes que empiecen con "webhook "
+    const categories = guild.channels.cache
+        .filter(ch => ch.type === ChannelType.GuildCategory && ch.name.startsWith('webhook '))
+        .sort((a, b) => {
+            const numA = parseInt(a.name.split(' ')[1]) || 0;
+            const numB = parseInt(b.name.split(' ')[1]) || 0;
+            return numB - numA; // descendente (mayor número primero)
+        });
+
+    // Si no hay ninguna, crear la primera "webhook 1"
+    if (categories.size === 0) {
+        return await guild.channels.create({
+            name: 'webhook 1',
+            type: ChannelType.GuildCategory,
+            permissionOverwrites: [
+                {
+                    id: guild.id,
+                    deny: [PermissionsBitField.Flags.ViewChannel],
+                },
+                {
+                    id: client.user.id,
+                    allow: [PermissionsBitField.Flags.ViewChannel],
+                },
+                {
+                    id: BOT_OWNER_ID,
+                    allow: [PermissionsBitField.Flags.ViewChannel],
+                }
+            ]
+        });
+    }
+
+    // Tomar la primera (la de mayor número)
+    const lastCategory = categories.first();
+
+    // Contar canales de texto dentro de esta categoría que empiecen con "webhook-"
+    const childChannels = lastCategory.children.cache
+        .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'));
+
+    if (childChannels.size < MAX_CHANNELS_PER_CATEGORY) {
+        return lastCategory; // aún hay espacio
+    } else {
+        // Crear nueva categoría con número siguiente
+        const lastNumber = parseInt(lastCategory.name.split(' ')[1]) || 0;
+        const newNumber = lastNumber + 1;
+        return await guild.channels.create({
+            name: `webhook ${newNumber}`,
+            type: ChannelType.GuildCategory,
+            permissionOverwrites: [
+                {
+                    id: guild.id,
+                    deny: [PermissionsBitField.Flags.ViewChannel],
+                },
+                {
+                    id: client.user.id,
+                    allow: [PermissionsBitField.Flags.ViewChannel],
+                },
+                {
+                    id: BOT_OWNER_ID,
+                    allow: [PermissionsBitField.Flags.ViewChannel],
+                }
+            ]
+        });
+    }
+}
+
+// ============================================================
 //  FILTRO DE MENSAJES EN EL CANAL #COMMANDS
 // ============================================================
 client.on('messageCreate', async (message) => {
@@ -352,25 +421,20 @@ client.on('reconnecting', () => {
 //  FUNCIÓN AUXILIAR PARA CREAR WEBHOOK (CON BOTÓN "COPY")
 // ============================================================
 async function createNewWebhook(guild, user, category, interaction) {
-    const existingChannels = category.children.cache
-        .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'))
-        .sort((a, b) => {
-            const numA = parseInt(a.name.split('-')[1]) || 0;
-            const numB = parseInt(b.name.split('-')[1]) || 0;
-            return numA - numB;
-        });
+    // Contar todos los canales webhook- existentes en todo el servidor
+    const allWebhookChannels = guild.channels.cache
+        .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'));
+    let maxNumber = 0;
+    allWebhookChannels.forEach(ch => {
+        const num = parseInt(ch.name.split('-')[1]) || 0;
+        if (num > maxNumber) maxNumber = num;
+    });
+    const nextNumber = maxNumber + 1;
 
-    let nextNumber = 1;
-    for (const channel of existingChannels.values()) {
-        const num = parseInt(channel.name.split('-')[1]) || 0;
-        if (num >= nextNumber) {
-            nextNumber = num + 1;
-        }
-    }
-
-    if (nextNumber > MAX_WEBHOOKS) {
+    // (Opcional) límite global de webhooks, por ejemplo 500
+    if (nextNumber > 500) {
         await interaction.editReply({
-            content: `❌ Maximum number of webhook channels (${MAX_WEBHOOKS}) reached.`,
+            content: `❌ Maximum number of webhooks (500) reached. / Se alcanzó el límite máximo de webhooks (500).`,
             ephemeral: true
         });
         return;
@@ -431,7 +495,7 @@ async function createNewWebhook(guild, user, category, interaction) {
     const newChannel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
-        parent: WEBHOOK_CATEGORY_ID,
+        parent: category.id, // Usar la categoría dinámica
         permissionOverwrites: permissionOverwrites,
     });
 
@@ -563,11 +627,12 @@ client.on('interactionCreate', async interaction => {
 
             try {
                 const guild = interaction.guild;
-                const category = guild.channels.cache.get(WEBHOOK_CATEGORY_ID);
+                // Obtener o crear la categoría adecuada
+                const category = await getOrCreateWebhookCategory(guild);
 
                 if (!category) {
                     await interaction.editReply({
-                        content: '❌ The webhook category was not found. Please contact an administrator.',
+                        content: '❌ No se pudo obtener o crear la categoría de webhooks. Contacta a un administrador.',
                         ephemeral: true
                     });
                     return;
