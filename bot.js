@@ -140,7 +140,7 @@ const GEAR_ITEMS = [
     "Bloodmoon Slap", "Radioactive Slap", "Rainbow Slap",
     "Rainbow Hammer", "Bloodmoon Hammer", "Radioactive Airstrike",
     "Yin Yang Lamp", "Demon's Head", "Lava Slap", "Lava Blaster",
-    "Alien Slap", "Blackhole Bomb", "Candy Sentry"
+    "Alien Slap", "Blackhole Bomb", "Candy Sentry","Phantom Slap"
 ];
 
 // ============================================================
