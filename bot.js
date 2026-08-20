@@ -46,7 +46,7 @@ function saveWebhooks(webhooks) {
 //  LISTAS DE BRAINROTS (SECRET Y OG) - Completas
 // ============================================================
 const BRAINROTS_SECRET = [
-            '1x1x1x1', '25', '67', 'Abyssaloco', 'Agarrini la Palini', 'Antonio',
+           '1x1x1x1', '25', '67', 'Abyssaloco', 'Agarrini la Palini', 'Antonio',
             'Aquarino', 'Arcadopus', 'Arcadragon', 'Bacuru and Egguru', 'Bananito',
             'Baskito', 'Bearito Cabinito', 'Berryno', 'Bisonte Giuppitere',
             'Blackhole Goat', 'Boatito Auratito', 'Bombardiro Vaccariro', 'Boppin Bunny',
@@ -119,7 +119,7 @@ const BRAINROTS_SECRET = [
             'Noodle Noodle Poodle', 'Grabatron', 'Cangurato Gelato', 'Rubiko and Kubiko', 'Toro Españolo', 'Chicleteira Champeona',
             'Examen Bros', 'Pizza and Ranch', 'Los Secret Combinasionas','Gelatina Volatina','Conetto Morsetto','Pogo Pogo Penguin',
             'Peschito Machito', 'Honey Honey Bear', 'Scorpino Coasterino', 'Quenn Bee', 'Smore Serat', 'Yetimactic', 'La Breakfast Combinasion',
-            'Bumbatron', 'Candini Fluffini', 'Polaroidini', 'La Fuse Machine'
+            'Bumbatron', 'Candini Fluffini', 'Polaroidini', 'La Fuse Machine', 'Burrito Bat', 'Tacoturbo Tacorito', 'Nachorilla', 'Sammyni Truckini'
 ];
 
 const BRAINROTS_OG = [
