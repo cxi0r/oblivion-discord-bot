@@ -120,7 +120,8 @@ const BRAINROTS_SECRET = [
             'Examen Bros', 'Pizza and Ranch', 'Los Secret Combinasionas','Gelatina Volatina','Conetto Morsetto','Pogo Pogo Penguin',
             'Peschito Machito', 'Honey Honey Bear', 'Scorpino Coasterino', 'Quenn Bee', 'Smore Serat', 'Yetimactic', 'La Breakfast Combinasion',
             'Bumbatron', 'Candini Fluffini', 'Polaroidini', 'La Fuse Machine', 'Burrito Bat', 'Tacoturbo Tacorito', 'Nachorilla', 'Sammyni Truckini',
-            'Orchidox', 'Pop Pop Petalini', 'Motorino Bumbuni'
+            'Orchidox', 'Pop Pop Petalini', 'Motorino Bumbuni','Motorino Bumbuni','Pelican Pachetto','Deputy Leopard', 'Chicli Chicla', 
+            'Panda Popanda', 'La Craft Machine','Gold and Diamond', 'Los Dragons'
 ];
 
 const BRAINROTS_OG = [
