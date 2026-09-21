@@ -425,7 +425,7 @@ client.on('reconnecting', () => {
 //  FUNCIÓN AUXILIAR PARA CREAR WEBHOOK (CON BOTÓN "COPY")
 // ============================================================
 async function createNewWebhook(guild, user, category, interaction) {
-    // Contar todos los canales webhook- existentes en todo el servidor
+    // Obtener el mayor número de canal para generar el siguiente nombre
     const allWebhookChannels = guild.channels.cache
         .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'));
     let maxNumber = 0;
@@ -434,15 +434,6 @@ async function createNewWebhook(guild, user, category, interaction) {
         if (num > maxNumber) maxNumber = num;
     });
     const nextNumber = maxNumber + 1;
-
-    // (Opcional) límite global de webhooks, por ejemplo 500
-    if (nextNumber > 500) {
-        await interaction.editReply({
-            content: `❌ Maximum number of webhooks (500) reached. / Se alcanzó el límite máximo de webhooks (500).`,
-            ephemeral: true
-        });
-        return;
-    }
 
     const channelName = `webhook-${nextNumber}`;
 
