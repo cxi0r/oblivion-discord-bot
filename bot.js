@@ -732,10 +732,28 @@ client.on('interactionCreate', async interaction => {
                 await createNewWebhook(guild, user, category, interaction);
 
             } catch (error) {
-                console.error('Error al crear webhook:', error);
+                // Registrar solo el código y el mensaje, sin URLs ni tokens.
+                const discordCode = Number(error.code);
+                console.error('Error al crear webhook:', {
+                    code: error.code ?? null,
+                    message: error.message
+                });
+
+                let errorMessage;
+                if (discordCode === 30013) {
+                    errorMessage = '❌ Se alcanzó el límite de 500 CANALES del servidor (código 30013). Revisa los canales y categorías que ya no se usan.';
+                } else if (discordCode === 30058) {
+                    errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del servidor (código 30058). Revisa las integraciones de todo el servidor, no solo las de este bot.';
+                } else if (discordCode === 30007) {
+                    errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del canal (código 30007). Revisa las integraciones de ese canal.';
+                } else {
+                    errorMessage = `❌ No se pudo crear el webhook. Código: ${error.code ?? 'no disponible'}. Revisa el registro del servidor para ver el mensaje del error.`;
+                }
+
                 await interaction.editReply({
-                    content: `❌ Error creating webhook: ${error.message}`,
-                    ephemeral: true
+                    content: errorMessage,
+                    components: [],
+                    allowedMentions: { parse: [] }
                 });
             }
             return;
