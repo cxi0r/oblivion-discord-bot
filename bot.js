@@ -121,7 +121,7 @@ const BRAINROTS_SECRET = [
             'Peschito Machito', 'Honey Honey Bear', 'Scorpino Coasterino', 'Quenn Bee', 'Smore Serat', 'Yetimactic', 'La Breakfast Combinasion',
             'Bumbatron', 'Candini Fluffini', 'Polaroidini', 'La Fuse Machine', 'Burrito Bat', 'Tacoturbo Tacorito', 'Nachorilla', 'Sammyni Truckini',
             'Orchidox', 'Pop Pop Petalini', 'Motorino Bumbuni','Motorino Bumbuni','Pelican Pachetto','Deputy Leopard', 'Chicli Chicla', 
-            'Panda Popanda', 'La Craft Machine','Gold and Diamond', 'Los Dragons'
+            'Panda Popanda', 'La Craft Machine','Gold and Diamond', 'Los Dragons', 'Zebrino Pianino', 'Hydra Serpent'
 ];
 
 const BRAINROTS_OG = [
