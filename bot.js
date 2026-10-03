@@ -122,7 +122,8 @@ const BRAINROTS_SECRET = [
             'Bumbatron', 'Candini Fluffini', 'Polaroidini', 'La Fuse Machine', 'Burrito Bat', 'Tacoturbo Tacorito', 'Nachorilla', 'Sammyni Truckini',
             'Orchidox', 'Pop Pop Petalini', 'Motorino Bumbuni','Motorino Bumbuni','Pelican Pachetto','Deputy Leopard', 'Chicli Chicla', 
             'Panda Popanda', 'La Craft Machine','Gold and Diamond', 'Los Dragons', 'Zebrino Pianino', 'Hydra Serpent','Ranito Pepito', 'Ski Ski Skunki', 
-            'Capibaro Celestino', 'Pin Pin Pengu','Rexino Ramino', 'Rockarino Rockara', 'Qamar Camelamp', 'Marino Submarino','Lavamanta', 'Lionello Casarello', 'Draculino'
+            'Capibaro Celestino', 'Pin Pin Pengu','Rexino Ramino', 'Rockarino Rockara', 'Qamar Camelamp', 'Marino Submarino','Lavamanta', 'Lionello Casarello', 'Draculino', 
+            'Los Treaters', 'Fangaro Lupino', 'Oni Oni Panda', 'Sammyni Spookyni', 'Phoenix'
 ];
 
 const BRAINROTS_OG = [
