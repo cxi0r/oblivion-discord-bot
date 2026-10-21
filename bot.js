@@ -229,7 +229,10 @@ async function getOrCreateWebhookCategory(guild) {
                 },
                 {
                     id: client.user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel],
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.UseExternalEmojis,
+                    ],
                 },
                 {
                     id: BOT_OWNER_ID,
@@ -247,6 +250,13 @@ async function getOrCreateWebhookCategory(guild) {
         .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'));
 
     if (childChannels.size < MAX_CHANNELS_PER_CATEGORY) {
+        // Los canales privados tienen permisos propios; la categoría también debe permitir emojis.
+        const botOverwrite = lastCategory.permissionOverwrites.cache.get(client.user.id);
+        if (!botOverwrite?.allow.has(PermissionsBitField.Flags.UseExternalEmojis)) {
+            await lastCategory.permissionOverwrites.edit(client.user.id, {
+                UseExternalEmojis: true,
+            });
+        }
         return lastCategory; // aún hay espacio
     } else {
         // Crear nueva categoría con número siguiente
@@ -262,7 +272,10 @@ async function getOrCreateWebhookCategory(guild) {
                 },
                 {
                     id: client.user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel],
+                    allow: [
+                        PermissionsBitField.Flags.ViewChannel,
+                        PermissionsBitField.Flags.UseExternalEmojis,
+                    ],
                 },
                 {
                     id: BOT_OWNER_ID,
@@ -486,6 +499,7 @@ async function createNewWebhook(guild, user, category, interaction) {
                 PermissionsBitField.Flags.ReadMessageHistory,
                 PermissionsBitField.Flags.ManageMessages,
                 PermissionsBitField.Flags.ManageWebhooks,
+                PermissionsBitField.Flags.UseExternalEmojis,
             ],
         });
     }
