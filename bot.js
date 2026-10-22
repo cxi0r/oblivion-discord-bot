@@ -207,6 +207,49 @@ const client = new Client({
 // ============================================================
 //  FUNCIÓN PARA OBTENER O CREAR CATEGORÍA DINÁMICA
 // ============================================================
+// El permiso de emojis no debe impedir crear webhooks en servidores sin él.
+function webhookEmojiPermissions(guild) {
+    const botMember = guild.members.me || guild.members.cache.get(client.user.id);
+    return botMember?.permissions.has(PermissionsBitField.Flags.UseExternalEmojis)
+        ? [PermissionsBitField.Flags.UseExternalEmojis]
+        : [];
+}
+
+async function webhookStep(step, operation) {
+    try {
+        return await operation();
+    } catch (error) {
+        error.webhookStep = error.webhookStep || step;
+        throw error;
+    }
+}
+
+async function reportWebhookError(interaction, error) {
+    const discordCode = Number(error.code);
+    const step = error.webhookStep || 'preparar la solicitud';
+    // No registrar el objeto DiscordAPIError: puede contener tokens y URLs.
+    console.error('Error al crear webhook:', { code: error.code ?? null, step });
+
+    let errorMessage;
+    if (discordCode === 30013) {
+        errorMessage = '❌ Se alcanzó el límite de 500 CANALES del servidor (código 30013). Revisa los canales y categorías que ya no se usan.';
+    } else if (discordCode === 30058) {
+        errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del servidor (código 30058). Revisa las integraciones de todo el servidor, no solo las de este bot.';
+    } else if (discordCode === 30007) {
+        errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del canal (código 30007). Revisa las integraciones de ese canal.';
+    } else if (discordCode === 50013) {
+        errorMessage = `❌ Discord rechazó la operación por falta de permisos (50013). Paso: **${step}**. Contacta al administrador con este mensaje.`;
+    } else {
+        errorMessage = `❌ Error en el paso **${step}**. Código: ${error.code ?? 'no disponible'}. Contacta al administrador con este mensaje.`;
+    }
+
+    await interaction.editReply({
+        content: errorMessage,
+        components: [],
+        allowedMentions: { parse: [] }
+    });
+}
+
 async function getOrCreateWebhookCategory(guild) {
     // Buscar categorías existentes que empiecen con "webhook "
     const categories = guild.channels.cache
@@ -219,7 +262,7 @@ async function getOrCreateWebhookCategory(guild) {
 
     // Si no hay ninguna, crear la primera "webhook 1"
     if (categories.size === 0) {
-        return await guild.channels.create({
+        return await webhookStep('crear categoría de webhooks', () => guild.channels.create({
             name: 'webhook 1',
             type: ChannelType.GuildCategory,
             permissionOverwrites: [
@@ -231,7 +274,7 @@ async function getOrCreateWebhookCategory(guild) {
                     id: client.user.id,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.UseExternalEmojis,
+                        ...webhookEmojiPermissions(guild),
                     ],
                 },
                 {
@@ -239,7 +282,7 @@ async function getOrCreateWebhookCategory(guild) {
                     allow: [PermissionsBitField.Flags.ViewChannel],
                 }
             ]
-        });
+        }));
     }
 
     // Tomar la primera (la de mayor número)
@@ -250,19 +293,29 @@ async function getOrCreateWebhookCategory(guild) {
         .filter(ch => ch.type === ChannelType.GuildText && ch.name.startsWith('webhook-'));
 
     if (childChannels.size < MAX_CHANNELS_PER_CATEGORY) {
-        // Los canales privados tienen permisos propios; la categoría también debe permitir emojis.
+        // Mejorar la categoría es opcional: los canales nuevos reciben su propio permiso.
         const botOverwrite = lastCategory.permissionOverwrites.cache.get(client.user.id);
-        if (!botOverwrite?.allow.has(PermissionsBitField.Flags.UseExternalEmojis)) {
-            await lastCategory.permissionOverwrites.edit(client.user.id, {
-                UseExternalEmojis: true,
-            });
+        const canEdit = lastCategory.permissionsFor(client.user.id)
+            ?.has(PermissionsBitField.Flags.ManageRoles);
+        if (webhookEmojiPermissions(guild).length && canEdit
+            && !botOverwrite?.allow.has(PermissionsBitField.Flags.UseExternalEmojis)) {
+            try {
+                await lastCategory.permissionOverwrites.edit(client.user.id, {
+                    UseExternalEmojis: true,
+                });
+            } catch (error) {
+                console.warn('No se pudo ajustar emojis en la categoría; se continuará con el canal.', {
+                    code: error.code ?? null,
+                    categoryId: lastCategory.id
+                });
+            }
         }
         return lastCategory; // aún hay espacio
     } else {
         // Crear nueva categoría con número siguiente
         const lastNumber = parseInt(lastCategory.name.split(' ')[1]) || 0;
         const newNumber = lastNumber + 1;
-        return await guild.channels.create({
+        return await webhookStep('crear categoría de webhooks', () => guild.channels.create({
             name: `webhook ${newNumber}`,
             type: ChannelType.GuildCategory,
             permissionOverwrites: [
@@ -274,7 +327,7 @@ async function getOrCreateWebhookCategory(guild) {
                     id: client.user.id,
                     allow: [
                         PermissionsBitField.Flags.ViewChannel,
-                        PermissionsBitField.Flags.UseExternalEmojis,
+                        ...webhookEmojiPermissions(guild),
                     ],
                 },
                 {
@@ -282,7 +335,7 @@ async function getOrCreateWebhookCategory(guild) {
                     allow: [PermissionsBitField.Flags.ViewChannel],
                 }
             ]
-        });
+        }));
     }
 }
 
@@ -499,22 +552,22 @@ async function createNewWebhook(guild, user, category, interaction) {
                 PermissionsBitField.Flags.ReadMessageHistory,
                 PermissionsBitField.Flags.ManageMessages,
                 PermissionsBitField.Flags.ManageWebhooks,
-                PermissionsBitField.Flags.UseExternalEmojis,
+                ...webhookEmojiPermissions(guild),
             ],
         });
     }
 
-    const newChannel = await guild.channels.create({
+    const newChannel = await webhookStep('crear canal privado', () => guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
         parent: category.id, // Usar la categoría dinámica
         permissionOverwrites: permissionOverwrites,
-    });
+    }));
 
-    const webhook = await newChannel.createWebhook({
+    const webhook = await webhookStep('crear webhook en el canal privado', () => newChannel.createWebhook({
         name: `webhook-${user.username}`,
         avatar: user.displayAvatarURL(),
-    });
+    }));
 
     const webhooks = loadWebhooks();
     webhooks[user.id] = {
@@ -563,7 +616,7 @@ async function createNewWebhook(guild, user, category, interaction) {
                 .setStyle(ButtonStyle.Primary)
         );
 
-    await newChannel.send({
+    await webhookStep('enviar bienvenida al canal privado (el webhook ya fue creado)', () => newChannel.send({
         content: 
             `🔔 **${user.username}**, this is your personal webhook channel.\n\n` +
             `📌 **ENGLISH:** Only you and the bot owner can see this channel.\n` +
@@ -573,7 +626,7 @@ async function createNewWebhook(guild, user, category, interaction) {
             `🔗 Tu URL del webhook: ${webhook.url}\n` +
             `⚠️ Mantén esta URL privada. Cualquiera con esta URL puede enviar mensajes a este canal.`,
         components: [welcomeRow]
-    });
+    }));
 }
 
 // ============================================================
@@ -719,7 +772,11 @@ client.on('interactionCreate', async interaction => {
                                 console.error('Error al eliminar webhook anterior:', error);
                             }
 
-                            await createNewWebhook(guild, user, category, buttonInteraction);
+                            try {
+                                await createNewWebhook(guild, user, category, buttonInteraction);
+                            } catch (error) {
+                                await reportWebhookError(buttonInteraction, error);
+                            }
                             return;
                         }
                     });
@@ -740,29 +797,7 @@ client.on('interactionCreate', async interaction => {
                 await createNewWebhook(guild, user, category, interaction);
 
             } catch (error) {
-                // Registrar solo el código y el mensaje, sin URLs ni tokens.
-                const discordCode = Number(error.code);
-                console.error('Error al crear webhook:', {
-                    code: error.code ?? null,
-                    message: error.message
-                });
-
-                let errorMessage;
-                if (discordCode === 30013) {
-                    errorMessage = '❌ Se alcanzó el límite de 500 CANALES del servidor (código 30013). Revisa los canales y categorías que ya no se usan.';
-                } else if (discordCode === 30058) {
-                    errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del servidor (código 30058). Revisa las integraciones de todo el servidor, no solo las de este bot.';
-                } else if (discordCode === 30007) {
-                    errorMessage = '❌ Se alcanzó el límite de WEBHOOKS del canal (código 30007). Revisa las integraciones de ese canal.';
-                } else {
-                    errorMessage = `❌ No se pudo crear el webhook. Código: ${error.code ?? 'no disponible'}. Revisa el registro del servidor para ver el mensaje del error.`;
-                }
-
-                await interaction.editReply({
-                    content: errorMessage,
-                    components: [],
-                    allowedMentions: { parse: [] }
-                });
+                await reportWebhookError(interaction, error);
             }
             return;
         }
