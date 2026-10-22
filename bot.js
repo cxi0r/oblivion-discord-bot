@@ -43,6 +43,123 @@ function saveWebhooks(webhooks) {
 }
 
 // ============================================================
+//  LIMPIEZA DE CANALES PERSONALES SIN ACTIVIDAD DURANTE 20 DÍAS
+// ============================================================
+const WEBHOOK_INACTIVITY_MS = 20 * 24 * 60 * 60 * 1000;
+const WEBHOOK_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const webhookRecentActivity = new Map();
+let webhookCleanupRunning = false;
+
+function isPersonalWebhookChannel(channel) {
+    return channel?.guild?.id === GUILD_ID
+        && channel.type === ChannelType.GuildText
+        && /^webhook-\d+$/.test(channel.name)
+        && channel.parent?.type === ChannelType.GuildCategory
+        && /^webhook[ -]\d+$/.test(channel.parent.name)
+        && channel.permissionOverwrites.cache.get(GUILD_ID)
+            ?.deny.has(PermissionsBitField.Flags.ViewChannel);
+}
+
+function recordWebhookActivity(message) {
+    if (!isPersonalWebhookChannel(message.channel)) return;
+    const timestamp = Number(message.createdTimestamp);
+    if (!Number.isFinite(timestamp)) return;
+    webhookRecentActivity.set(message.channelId,
+        Math.max(timestamp, webhookRecentActivity.get(message.channelId) || 0));
+}
+
+function snowflakeTimestamp(id) {
+    if (!/^\d+$/.test(id || '')) return 0;
+    return Number((BigInt(id) >> 22n) + 1420070400000n);
+}
+
+function webhookLastActivity(channel, latestMessage) {
+    return Math.max(
+        Number(channel.createdTimestamp) || 0,
+        Number(latestMessage?.createdTimestamp) || 0,
+        snowflakeTimestamp(latestMessage?.id),
+        snowflakeTimestamp(channel.lastMessageId),
+        webhookRecentActivity.get(channel.id) || 0
+    );
+}
+
+function canInspectWebhookChannel(channel) {
+    const permissions = channel.permissionsFor(client.user.id);
+    return permissions?.has([
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.ManageChannels
+    ]);
+}
+
+async function isManagedWebhookChannel(channel) {
+    // El registro sobrevive si hay volumen; los webhooks de Discord permiten
+    // reconocer canales anteriores aunque Railway haya perdido el archivo local.
+    const registered = Object.values(loadWebhooks())
+        .some(data => data?.channelId === channel.id);
+    if (registered) return true;
+    const webhooks = await channel.fetchWebhooks();
+    return webhooks.some(webhook => webhook.type === 1
+        && webhook.channelId === channel.id && webhook.owner?.id === client.user.id);
+}
+
+function removeDeletedWebhookRegistration(channelId) {
+    // Volver a leer aquí evita sobreescribir altas creadas mientras se consultaba Discord.
+    const current = loadWebhooks();
+    let changed = false;
+    for (const [userId, data] of Object.entries(current)) {
+        if (data?.channelId === channelId) {
+            delete current[userId];
+            changed = true;
+        }
+    }
+    if (changed) saveWebhooks(current);
+    webhookRecentActivity.delete(channelId);
+}
+
+async function cleanupInactiveWebhookChannels() {
+    if (webhookCleanupRunning || !client.isReady()) return;
+    webhookCleanupRunning = true;
+    let deleted = 0;
+    try {
+        const guild = await client.guilds.fetch(GUILD_ID);
+        const channels = await guild.channels.fetch();
+        for (const channel of channels.values()) {
+            if (!isPersonalWebhookChannel(channel)) continue;
+            if (!Number.isFinite(channel.createdTimestamp)
+                || Date.now() - channel.createdTimestamp < WEBHOOK_INACTIVITY_MS) continue;
+            try {
+                if (!canInspectWebhookChannel(channel)) continue;
+                const latest = (await channel.messages.fetch({ limit: 1, cache: false })).first();
+                if (Date.now() - webhookLastActivity(channel, latest) < WEBHOOK_INACTIVITY_MS) continue;
+                if (!await isManagedWebhookChannel(channel)) continue;
+
+                // Revalidar alcance, permisos y actividad justo antes de borrar.
+                const fresh = await guild.channels.fetch(channel.id, { force: true });
+                if (!isPersonalWebhookChannel(fresh) || !canInspectWebhookChannel(fresh)) continue;
+                const confirmed = (await fresh.messages.fetch({ limit: 1, cache: false })).first();
+                const lastActivity = webhookLastActivity(fresh, confirmed);
+                if (!lastActivity || Date.now() - lastActivity < WEBHOOK_INACTIVITY_MS) continue;
+                await fresh.delete('Limpieza automática: canal personal de webhook sin mensajes durante al menos 20 días');
+                removeDeletedWebhookRegistration(fresh.id);
+                deleted++;
+                console.log('[Webhook cleanup] Canal inactivo eliminado', { channelId: fresh.id });
+            } catch (error) {
+                // Ante errores de lectura/permisos se conserva el canal.
+                console.warn('[Webhook cleanup] Canal omitido', {
+                    channelId: channel.id, code: error.code ?? null
+                });
+            }
+        }
+        console.log('[Webhook cleanup] Revisión terminada', { deleted });
+    } catch (error) {
+        console.warn('[Webhook cleanup] No se pudo completar la revisión', { code: error.code ?? null });
+    } finally {
+        webhookCleanupRunning = false;
+    }
+}
+
+// ============================================================
 //  LISTAS DE BRAINROTS (SECRET Y OG) - Completas
 // ============================================================
 const BRAINROTS_SECRET = [
@@ -343,6 +460,7 @@ async function getOrCreateWebhookCategory(guild) {
 //  FILTRO DE MENSAJES EN EL CANAL #COMMANDS
 // ============================================================
 client.on('messageCreate', async (message) => {
+    recordWebhookActivity(message);
     if (message.author.bot) return;
     if (message.channelId !== ALLOWED_CHANNEL_ID) return;
     if (message.content.startsWith('/')) return;
@@ -458,6 +576,11 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 client.once('clientReady', async () => {
     isBotReady = true;
     console.log(`✅ Bot connected as ${client.user.tag}`);
+    if (process.env.WEBHOOK_CLEANUP_ENABLED !== 'false') {
+        setTimeout(() => { void cleanupInactiveWebhookChannels(); }, 60 * 1000);
+        setInterval(() => { void cleanupInactiveWebhookChannels(); }, WEBHOOK_CLEANUP_INTERVAL_MS);
+        console.log('[Webhook cleanup] Activa: revisión cada 6 horas; inactividad mínima de 20 días');
+    }
     try {
         await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
             body: commands.map(cmd => cmd.toJSON())
