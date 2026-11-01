@@ -242,7 +242,7 @@ const BRAINROTS_SECRET = [
             'Capibaro Celestino', 'Pin Pin Pengu','Rexino Ramino', 'Rockarino Rockara', 'Qamar Camelamp', 'Marino Submarino','Lavamanta', 'Lionello Casarello', 'Draculino', 
             'Los Treaters', 'Fangaro Lupino', 'Oni Oni Panda', 'Sammyni Spookyni', 'Phoenix','Candi Corni', 'Grim Cheese', 'Zombie Bowl', 'Bananito Skelito', 'bat-in-the-Box', 'Boo Boo Rocket', 
             'Flying Dutchman', 'Dragon Skeletonini','Chicken Zombie', 'Tosto Dino', 'Cobra Gelato', 'Skelly and Coffy', 'Medusini and Demonini', 'Arca Bros', 'Co Co Co Sahur', 'Skooter Skelly', 'Money Money Cat',
-            'Fang Fang Draculang', 'Pum Pum Pum', 'Spooky Spooky Sahur', 'Spooketti Tualetti'
+            'Fang Fang Draculang', 'Pum Pum Pum', 'Spooky Spooky Sahur', 'Spooketti Tualetti','Puppetmaster', 'Scorpi Inferni', 'Jacko Jakat', 'Spooky Kart', 'Scarino Crowino'
 ];
 
 const BRAINROTS_OG = [
